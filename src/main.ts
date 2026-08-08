@@ -1,6 +1,9 @@
 import './styles.css';
 import './season.css';
+import './health.css';
 import { RACERS } from './game/config';
+import { RaceHealthMonitor } from './game/RaceHealthMonitor';
+import { installSmartLabelDeclutter } from './game/SmartLabelDeclutter';
 import { SeasonManager } from './game/SeasonManager';
 import {
   getCircuitById,
@@ -15,10 +18,13 @@ import {
   type RaceSnapshot
 } from './game/RaceEngine';
 
+installSmartLabelDeclutter();
+
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
 
 const season = new SeasonManager();
+const health = new RaceHealthMonitor();
 const query = new URLSearchParams(window.location.search);
 const scheduledCircuit = getCircuitForRound(season.getNextRoundNumber());
 const requestedCircuit = getCircuitById(query.get('circuit') ?? '');
@@ -55,7 +61,7 @@ app.innerHTML = `
       <div class="brand">
         <div class="eyebrow">PARALLAX FIELD THEORY SPORTS · BRBC WORLD FEED</div>
         <h1>PARALLAX <span>GRAN PRIX</span></h1>
-        <p>${escapeHtml(currentCircuit.name.toUpperCase())} · CIRCUIT ENGINE SLICE</p>
+        <p>${escapeHtml(currentCircuit.name.toUpperCase())} · RACE HEALTH SLICE</p>
       </div>
 
       <div class="grid-show" id="grid-show" aria-live="polite">
@@ -99,6 +105,11 @@ app.innerHTML = `
           <span>BATTLE</span><strong id="battle">—</strong>
         </div>
         <div class="course-key">${courseKey}</div>
+        <div class="health-strip">
+          <div class="health-head"><span>FIELD HEALTH</span><b id="health-score">100%</b></div>
+          <div class="marshal-status" id="marshal-status">RECOVERY MARSHAL · STANDBY</div>
+          <div class="health-problems" id="health-problems"><div class="health-empty">ALL VESSELS NOMINAL</div></div>
+        </div>
       </div>
 
       <div class="hud hud-right">
@@ -162,10 +173,14 @@ const battlePairEl = document.querySelector<HTMLElement>('#battle-pair')!;
 const battleGapEl = document.querySelector<HTMLElement>('#battle-gap')!;
 const broadcastStackEl = document.querySelector<HTMLElement>('#broadcast-stack')!;
 const seasonPanelEl = document.querySelector<HTMLElement>('#season-panel')!;
+const healthScoreEl = document.querySelector<HTMLElement>('#health-score')!;
+const marshalStatusEl = document.querySelector<HTMLElement>('#marshal-status')!;
+const healthProblemsEl = document.querySelector<HTMLElement>('#health-problems')!;
 
 seedInput.value = String(initialSeed);
 let broadcastHistory: BroadcastMessage[] = [];
 let previousRaceState: RaceSnapshot['state'] = 'ready';
+let marshalFlashTimer = 0;
 
 const engine = new RaceEngine(viewport, {
   seed: initialSeed,
@@ -176,16 +191,21 @@ const engine = new RaceEngine(viewport, {
 
 renderSeasonPanel();
 renderRoundMeta();
+renderHealth();
 
 startButton.addEventListener('click', () => {
+  health.reset();
   broadcastHistory = [];
   renderBroadcastHistory();
+  renderHealth();
   engine.startRace();
 });
 
 resetButton.addEventListener('click', () => {
+  health.reset();
   broadcastHistory = [];
   renderBroadcastHistory();
+  renderHealth();
   engine.resetRace();
 });
 
@@ -206,8 +226,10 @@ seedInput.addEventListener('keydown', (event) => {
 function applySeed() {
   const value = Math.abs(Math.trunc(Number(seedInput.value))) || 369;
   seedInput.value = String(value);
+  health.reset();
   broadcastHistory = [];
   renderBroadcastHistory();
+  renderHealth();
   engine.setSeed(value);
   const nextUrl = new URL(window.location.href);
   nextUrl.searchParams.set('seed', String(value));
@@ -242,10 +264,12 @@ function navigateToCircuit(circuit: CircuitDefinition, seed: number) {
 }
 
 function renderSnapshot(snapshot: RaceSnapshot) {
+  health.observeSnapshot(snapshot);
+
   if (snapshot.state === 'finished' && previousRaceState !== 'finished' && snapshot.receipt) {
     const championshipRound = season.getNextRoundNumber();
     if (currentCircuit.seasonRound === championshipRound) {
-      season.recordRace(snapshot.receipt, snapshot.standings, currentCircuit);
+      season.recordRace(snapshot.receipt, snapshot.standings, currentCircuit, health.getReport());
       renderSeasonPanel();
       renderRoundMeta();
     }
@@ -290,14 +314,18 @@ function renderSnapshot(snapshot: RaceSnapshot) {
     || nextScheduled?.status !== 'playable';
 
   standingsEl.innerHTML = snapshot.standings.map((standing) => {
+    const racerHealth = health.getRacer(standing.id);
+    const state = racerHealth?.state ?? 'GREEN';
     const time = standing.finished && standing.finishTime !== undefined
       ? `${standing.finishTime.toFixed(2)}s`
-      : `${Math.round(standing.progress * 100)}%`;
+      : snapshot.state === 'finished'
+        ? 'DNF'
+        : `${Math.round(standing.progress * 100)}%`;
     return `
       <li class="standing ${standing.place === 1 ? 'leader-row' : ''}" style="--racer-accent:${standing.accent}">
         <b>${standing.place}</b>
         <i>${escapeHtml(standing.code)}</i>
-        <span><strong>${escapeHtml(standing.name)}</strong><small>${escapeHtml(standing.team)}</small></span>
+        <span><strong>${escapeHtml(standing.name)}</strong><small>${escapeHtml(standing.team)} <span class="health-inline" data-state="${state}">· ${healthCode(state)}</span></small></span>
         <em>${time}</em>
       </li>
     `;
@@ -311,7 +339,28 @@ function renderSnapshot(snapshot: RaceSnapshot) {
     battleCardEl.classList.remove('visible');
   }
 
+  renderHealth();
   renderReceipt(snapshot.replayActive ? undefined : snapshot.receipt);
+}
+
+function renderHealth() {
+  const report = health.getReport();
+  healthScoreEl.textContent = `${report.score}%`;
+
+  const problems = report.racers
+    .filter((row) => !['GREEN', 'FINISHED'].includes(row.state) || row.recoveries > 0)
+    .sort((a, b) => healthPriority(b.state) - healthPriority(a.state) || b.recoveries - a.recoveries)
+    .slice(0, 4);
+
+  healthProblemsEl.innerHTML = problems.length
+    ? problems.map((row) => `
+      <div class="health-problem" data-state="${row.state}">
+        <b>${escapeHtml(row.code)}</b>
+        <span>${escapeHtml(row.name)} · ${row.state}</span>
+        <em>${row.recoveries ? `${row.recoveries}R` : `${row.noProgressSeconds.toFixed(1)}s`}</em>
+      </div>
+    `).join('')
+    : '<div class="health-empty">ALL VESSELS NOMINAL</div>';
 }
 
 function renderReceipt(receipt?: RaceReceipt) {
@@ -323,6 +372,11 @@ function renderReceipt(receipt?: RaceReceipt) {
 
   const margin = receipt.margin === null ? '—' : `${receipt.margin.toFixed(3)}s`;
   const winningTime = receipt.winningTime === null ? '—' : `${receipt.winningTime.toFixed(3)}s`;
+  const report = health.getReport();
+  const recoveryLog = report.recoveryLog.length
+    ? report.recoveryLog.map((entry) => `<span>${entry.elapsed.toFixed(2)}s · ${escapeHtml(entry.racerName)}</span>`).join('')
+    : '<span>NO RECOVERY INTERVENTIONS</span>';
+
   receiptEl.innerHTML = `
     <div class="receipt-title">PARALLAX RACE RECEIPT · BRBC PRODUCTION LOG</div>
     <div class="receipt-winner">${escapeHtml(receipt.winner)}</div>
@@ -335,6 +389,8 @@ function renderReceipt(receipt?: RaceReceipt) {
       <span>OVERTAKES CALLED</span><b>${receipt.overtakes}</b>
       <span>BRBC COLLISIONS</span><b>${receipt.collisionEvents}</b>
       <span>RECOVERY MARSHAL</span><b>${receipt.recoveryInterventions}</b>
+      <span>DNF</span><b>${report.dnfs}</b>
+      <span>FIELD HEALTH</span><b>${report.score}%</b>
       <span>DIRECTOR CUTS</span><b>${receipt.directorCuts}</b>
       <span>BROADCAST LINES</span><b>${receipt.broadcastLines}</b>
       <span>REPLAY FRAMES</span><b>${receipt.replayFrames}</b>
@@ -342,7 +398,11 @@ function renderReceipt(receipt?: RaceReceipt) {
       <span>FINISHERS</span><b>${receipt.finishers}/12</b>
       <span>SEED</span><b>${receipt.seed}</b>
     </div>
-    <div class="receipt-rule">SIMULATION AUTHORITATIVE · RECOVERY IMPULSES RECEIPTED · REPLAY VISUAL ONLY</div>
+    <div class="receipt-health">
+      <strong>RACE HEALTH LOG · OBSERVATIONAL</strong>
+      <div class="receipt-health-log">${recoveryLog}</div>
+    </div>
+    <div class="receipt-rule">SIMULATION AUTHORITATIVE · RECOVERY IMPULSES RECEIPTED · DNF EARNS ZERO POINTS · REPLAY VISUAL ONLY</div>
   `;
   receiptEl.classList.add('visible');
 }
@@ -358,17 +418,17 @@ function renderSeasonPanel() {
   const driverRows = drivers.slice(0, 6).map((driver, index) => `
     <div class="champ-row">
       <b>${index + 1}</b><i>${escapeHtml(driver.code)}</i>
-      <span><strong>${escapeHtml(driver.name)}</strong><small>${driver.wins}W · ${driver.podiums} podiums</small></span>
+      <span><strong>${escapeHtml(driver.name)}</strong><small>${driver.wins}W · ${driver.podiums} podiums · ${driver.dnfs} DNF</small></span>
       <em>${driver.points} pts</em>
     </div>
   `).join('');
   const teamRows = teams.slice(0, 5).map((team, index) => `
     <div class="champ-row team-row">
-      <b>${index + 1}</b><span><strong>${escapeHtml(team.team)}</strong><small>${team.wins} wins</small></span><em>${team.points} pts</em>
+      <b>${index + 1}</b><span><strong>${escapeHtml(team.team)}</strong><small>${team.wins} wins · ${team.dnfs} DNF</small></span><em>${team.points} pts</em>
     </div>
   `).join('');
   const historyRows = [...state.races].reverse().slice(0, 8).map((race) => `
-    <div class="history-row"><b>R${race.round}</b><span>${escapeHtml(race.receipt.winner)} · ${escapeHtml(race.circuitName)}</span><em>${race.seed}</em></div>
+    <div class="history-row"><b>R${race.round}</b><span>${escapeHtml(race.receipt.winner)} · ${escapeHtml(race.circuitName)}${race.health ? ` · H${race.health.score}` : ''}</span><em>${race.seed}</em></div>
   `).join('');
 
   seasonPanelEl.innerHTML = `
@@ -382,14 +442,14 @@ function renderSeasonPanel() {
       <div class="season-stat"><span>LAST WIN</span><b>${escapeHtml(latest?.results[0]?.code ?? '—')}</b></div>
     </div>
     <div class="season-section"><div class="season-section-title">NEXT EVENT · ROUND ${nextRound}</div><div class="empty-season">${escapeHtml(nextCircuit?.name ?? 'UNREGISTERED')} · ${nextCircuit?.status === 'playable' ? 'PLAYABLE' : 'PLANNED'}</div></div>
-    <div class="season-section"><div class="season-section-title">DRIVER CHAMPIONSHIP · 25–18–15–12–10–8–6–4–2–1</div><div class="champ-list">${driverRows}</div></div>
+    <div class="season-section"><div class="season-section-title">DRIVER CHAMPIONSHIP · DNF = 0 POINTS</div><div class="champ-list">${driverRows}</div></div>
     <div class="season-section"><div class="season-section-title">TEAM CHAMPIONSHIP</div><div class="champ-list">${teamRows}</div></div>
     <div class="season-section"><div class="season-section-title">RECEIPT HISTORY</div><div class="race-history">${historyRows || '<div class="empty-season">NO RACES RECORDED YET</div>'}</div></div>
     <div class="season-actions">
       <button class="secondary" id="export-season">EXPORT LEDGER</button>
       <button class="secondary" id="reset-season">NEW SEASON</button>
     </div>
-    <div class="season-rule">LOCAL-FIRST SEASON STATE · EACH RESULT DERIVED FROM A RACE RECEIPT</div>
+    <div class="season-rule">LOCAL-FIRST SEASON STATE · RESULTS + HEALTH ENVELOPES DERIVED FROM OBSERVED RACES</div>
   `;
 
   seasonPanelEl.querySelector<HTMLButtonElement>('#season-close')?.addEventListener('click', () => seasonPanelEl.classList.remove('visible'));
@@ -427,9 +487,23 @@ function exportSeasonLedger() {
 }
 
 function renderBroadcast(message: BroadcastMessage) {
+  health.observeBroadcast(message);
+  if (message.type === 'recovery') flashMarshal(message.text);
   broadcastHistory.push(message);
   broadcastHistory = broadcastHistory.slice(-3);
   renderBroadcastHistory();
+  renderHealth();
+}
+
+function flashMarshal(line: string) {
+  if (marshalFlashTimer) window.clearTimeout(marshalFlashTimer);
+  const racer = RACERS.find((candidate) => line.toLowerCase().includes(candidate.name.toLowerCase()));
+  marshalStatusEl.textContent = `RECOVERY MARSHAL · ACTIVE · ${racer?.code ?? 'FIELD'}`;
+  marshalStatusEl.classList.add('active');
+  marshalFlashTimer = window.setTimeout(() => {
+    marshalStatusEl.textContent = 'RECOVERY MARSHAL · STANDBY';
+    marshalStatusEl.classList.remove('active');
+  }, 3200);
 }
 
 function renderBroadcastHistory() {
@@ -450,6 +524,21 @@ function renderBroadcastHistory() {
   `).join('');
   broadcastStackEl.classList.remove('pulse');
   requestAnimationFrame(() => broadcastStackEl.classList.add('pulse'));
+}
+
+function healthCode(state: string) {
+  if (state === 'FINISHED') return 'FIN';
+  if (state === 'RECOVERED') return 'REC';
+  if (state === 'STALLED') return 'STALL';
+  return state;
+}
+
+function healthPriority(state: string) {
+  if (state === 'DNF') return 5;
+  if (state === 'STALLED') return 4;
+  if (state === 'RECOVERED') return 3;
+  if (state === 'WATCH') return 2;
+  return 0;
 }
 
 function shotLabel(shot: string) {
