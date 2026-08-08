@@ -1,6 +1,11 @@
-import { SECTORS } from './config';
+export type CircuitStatus = 'playable' | 'planned';
 
-export type CircuitStatus = 'active' | 'planned';
+export type CircuitSector = {
+  id: string;
+  name: string;
+  startZ: number;
+  endZ: number;
+};
 
 export type CircuitDefinition = {
   id: string;
@@ -9,22 +14,47 @@ export type CircuitDefinition = {
   status: CircuitStatus;
   seasonRound: number;
   description: string;
-  sectors: readonly { id: string; name: string; startZ: number; endZ: number }[];
+  sectors: readonly CircuitSector[];
   features: readonly string[];
 };
+
+export const BATTLECASE_SECTORS: readonly CircuitSector[] = [
+  { id: 'boot', name: 'BOOT STRAIGHT', startZ: -50, endZ: -31 },
+  { id: 'gpu', name: 'GPU CANYON', startZ: -31, endZ: -13 },
+  { id: 'cooling', name: 'COOLING GAUNTLET', startZ: -13, endZ: 9 },
+  { id: 'split', name: 'PARALLAX SPLIT', startZ: 9, endZ: 31 },
+  { id: 'sprint', name: 'MOTHERBOARD SPRINT', startZ: 31, endZ: 50 }
+] as const;
+
+export const BACKSPIN_SECTORS: readonly CircuitSector[] = [
+  { id: 'needle', name: 'DROP THE NEEDLE', startZ: -50, endZ: -31 },
+  { id: 'groove', name: 'GROOVE RUN', startZ: -31, endZ: -11 },
+  { id: 'tonearm', name: 'TONEARM CROSSING', startZ: -11, endZ: 10 },
+  { id: 'split', name: 'CROSSFADER SPLIT', startZ: 10, endZ: 31 },
+  { id: 'speaker', name: 'SPEAKER STACK SPRINT', startZ: 31, endZ: 50 }
+] as const;
 
 export const CIRCUITS: CircuitDefinition[] = [
   {
     id: 'battlecase',
     name: 'Battlecase Circuit',
     shortName: 'Battlecase',
-    status: 'active',
+    status: 'playable',
     seasonRound: 1,
     description: 'A motherboard canyon of heatsinks, cooling hardware, rotating sweepers, and the first physical Parallax Split.',
-    sectors: SECTORS,
-    features: ['gpu-canyon', 'cooling-gauntlet', 'parallax-split', 'finish-replay']
+    sectors: BATTLECASE_SECTORS,
+    features: ['gpu-canyon', 'cooling-gauntlet', 'parallax-split', 'finish-replay', 'recovery-marshal']
   },
-  { id: 'backspin-96', name: "Backspin '96", shortName: 'Backspin', status: 'planned', seasonRound: 2, description: 'Turntables, grooves, crossfaders, and reverse-motion hazards.', sectors: [], features: ['turntables', 'crossfader'] },
+  {
+    id: 'backspin-96',
+    name: "Backspin '96",
+    shortName: 'Backspin',
+    status: 'playable',
+    seasonRound: 2,
+    description: 'A giant DJ deck of platter grooves, tonearm sweepers, a crossfader split, and speaker-cone kickers.',
+    sectors: BACKSPIN_SECTORS,
+    features: ['turntables', 'tonearms', 'crossfader', 'speaker-kickers', 'finish-replay', 'recovery-marshal']
+  },
   { id: 'spaungear', name: 'SPAUNGEAR Works', shortName: 'SPAUNGEAR', status: 'planned', seasonRound: 3, description: 'Mechanical transfer points across rotating gear fields.', sectors: [], features: ['gears', 'transfer-gates'] },
   { id: 'mirror-labyrinth', name: 'Mirror Labyrinth', shortName: 'Mirror', status: 'planned', seasonRound: 4, description: 'Symmetry, inverse routes, reflective tunnels, and misleading geometry.', sectors: [], features: ['mirrors', 'inverse-routes'] },
   { id: 'ledger-larry-500', name: 'Ledger Larry 500', shortName: 'Larry 500', status: 'planned', seasonRound: 5, description: 'Administrative machinery, paper rollers, stamps, and catastrophic accounting.', sectors: [], features: ['paperwork', 'audit-gates'] },
@@ -34,4 +64,16 @@ export const CIRCUITS: CircuitDefinition[] = [
   { id: '369-final', name: 'The 3–6–9 Grand Final', shortName: '3–6–9 Final', status: 'planned', seasonRound: 9, description: 'Three opening paths, six chambers, nine convergence gates, one championship finish.', sectors: [], features: ['3-6-9', 'championship'] }
 ];
 
-export const ACTIVE_CIRCUIT = CIRCUITS.find((circuit) => circuit.status === 'active') ?? CIRCUITS[0];
+export function getCircuitById(id: string) {
+  return CIRCUITS.find((circuit) => circuit.id === id);
+}
+
+export function getCircuitForRound(round: number) {
+  return CIRCUITS.find((circuit) => circuit.seasonRound === round);
+}
+
+export function getPlayableCircuits() {
+  return CIRCUITS.filter((circuit) => circuit.status === 'playable');
+}
+
+export const ACTIVE_CIRCUIT = getCircuitById('battlecase') ?? CIRCUITS[0];

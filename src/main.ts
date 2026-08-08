@@ -2,7 +2,12 @@ import './styles.css';
 import './season.css';
 import { RACERS } from './game/config';
 import { SeasonManager } from './game/SeasonManager';
-import { ACTIVE_CIRCUIT } from './game/TrackRegistry';
+import {
+  getCircuitById,
+  getCircuitForRound,
+  getPlayableCircuits,
+  type CircuitDefinition
+} from './game/TrackRegistry';
 import {
   RaceEngine,
   type BroadcastMessage,
@@ -14,6 +19,22 @@ const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
 
 const season = new SeasonManager();
+const query = new URLSearchParams(window.location.search);
+const scheduledCircuit = getCircuitForRound(season.getNextRoundNumber());
+const requestedCircuit = getCircuitById(query.get('circuit') ?? '');
+const currentCircuit = requestedCircuit?.status === 'playable'
+  ? requestedCircuit
+  : scheduledCircuit?.status === 'playable'
+    ? scheduledCircuit
+    : getPlayableCircuits()[0];
+
+if (!currentCircuit) throw new Error('No playable Parallax Gran Prix circuit is registered');
+
+const querySeed = Number(query.get('seed'));
+const initialSeed = Number.isFinite(querySeed) && querySeed !== 0
+  ? Math.abs(Math.trunc(querySeed))
+  : season.suggestSeed();
+
 const gridCards = RACERS.map((racer, index) => `
   <div class="grid-racer" style="--racer-accent:${hex(racer.accent)}">
     <span>${String(index + 1).padStart(2, '0')}</span>
@@ -22,7 +43,8 @@ const gridCards = RACERS.map((racer, index) => `
   </div>
 `).join('');
 
-const courseKey = ACTIVE_CIRCUIT.sectors.slice(1).map((sector) => `<span>${escapeHtml(sector.name)}</span>`).join('');
+const courseKey = currentCircuit.sectors.slice(1).map((sector) => `<span>${escapeHtml(sector.name)}</span>`).join('');
+const firstSectorName = currentCircuit.sectors[0]?.name ?? 'START';
 
 app.innerHTML = `
   <main class="shell">
@@ -33,18 +55,18 @@ app.innerHTML = `
       <div class="brand">
         <div class="eyebrow">PARALLAX FIELD THEORY SPORTS · BRBC WORLD FEED</div>
         <h1>PARALLAX <span>GRAN PRIX</span></h1>
-        <p>${escapeHtml(ACTIVE_CIRCUIT.name.toUpperCase())} · SEASON OPERATIONS</p>
+        <p>${escapeHtml(currentCircuit.name.toUpperCase())} · CIRCUIT ENGINE SLICE</p>
       </div>
 
       <div class="grid-show" id="grid-show" aria-live="polite">
         <div class="grid-show-kicker" id="grid-kicker">SEASON 1 · ROUND 1</div>
-        <div class="grid-show-title">${escapeHtml(ACTIVE_CIRCUIT.name.toUpperCase())}</div>
+        <div class="grid-show-title">${escapeHtml(currentCircuit.name.toUpperCase())}</div>
         <div class="grid-show-sub">12 FIELD VESSELS · PHYSICS AUTHORITATIVE</div>
         <div class="grid-roster">${gridCards}</div>
         <div class="grid-show-footer">THREVE · SIX'T · NOINE <span>BRBC</span></div>
       </div>
 
-      <div class="sector-banner" id="sector-banner">BOOT STRAIGHT</div>
+      <div class="sector-banner" id="sector-banner">${escapeHtml(firstSectorName)}</div>
       <div class="countdown" id="countdown" aria-live="assertive"></div>
       <div class="replay-bug" id="replay-bug">BRBC FINISH REPLAY · 0.42×</div>
 
@@ -62,6 +84,7 @@ app.innerHTML = `
           <button id="next-round" class="secondary" disabled>NEXT ROUND</button>
           <button id="season-toggle" class="secondary">SEASON</button>
         </div>
+        <button id="circuit-cycle" class="secondary camera-button">TRACK · ${escapeHtml(currentCircuit.shortName.toUpperCase())}</button>
         <label class="seed-label" for="seed">SIMULATION SEED</label>
         <div class="seed-row">
           <input id="seed" type="number" inputmode="numeric" />
@@ -71,7 +94,7 @@ app.innerHTML = `
           <span>STATE</span><strong id="state">READY</strong>
           <span>TIME</span><strong id="time">0.00</strong>
           <span>LEADER</span><strong id="leader">—</strong>
-          <span>SECTOR</span><strong id="sector">BOOT STRAIGHT</strong>
+          <span>SECTOR</span><strong id="sector">${escapeHtml(firstSectorName)}</strong>
           <span>DIRECTOR</span><strong id="director">GRID WIDE</strong>
           <span>BATTLE</span><strong id="battle">—</strong>
         </div>
@@ -117,6 +140,7 @@ const cameraButton = document.querySelector<HTMLButtonElement>('#camera')!;
 const replayButton = document.querySelector<HTMLButtonElement>('#replay')!;
 const nextRoundButton = document.querySelector<HTMLButtonElement>('#next-round')!;
 const seasonToggleButton = document.querySelector<HTMLButtonElement>('#season-toggle')!;
+const circuitCycleButton = document.querySelector<HTMLButtonElement>('#circuit-cycle')!;
 const applySeedButton = document.querySelector<HTMLButtonElement>('#apply-seed')!;
 const seedInput = document.querySelector<HTMLInputElement>('#seed')!;
 const stateEl = document.querySelector<HTMLElement>('#state')!;
@@ -139,18 +163,13 @@ const battleGapEl = document.querySelector<HTMLElement>('#battle-gap')!;
 const broadcastStackEl = document.querySelector<HTMLElement>('#broadcast-stack')!;
 const seasonPanelEl = document.querySelector<HTMLElement>('#season-panel')!;
 
-const query = new URLSearchParams(window.location.search);
-const querySeed = Number(query.get('seed'));
-const initialSeed = Number.isFinite(querySeed) && querySeed !== 0
-  ? Math.abs(Math.trunc(querySeed))
-  : season.suggestSeed();
-
 seedInput.value = String(initialSeed);
 let broadcastHistory: BroadcastMessage[] = [];
 let previousRaceState: RaceSnapshot['state'] = 'ready';
 
 const engine = new RaceEngine(viewport, {
   seed: initialSeed,
+  circuitId: currentCircuit.id,
   onSnapshot: renderSnapshot,
   onBroadcast: renderBroadcast
 });
@@ -178,6 +197,7 @@ cameraButton.addEventListener('click', () => {
 replayButton.addEventListener('click', () => engine.playFinishReplay());
 nextRoundButton.addEventListener('click', prepareNextRound);
 seasonToggleButton.addEventListener('click', () => seasonPanelEl.classList.toggle('visible'));
+circuitCycleButton.addEventListener('click', cycleCircuit);
 applySeedButton.addEventListener('click', applySeed);
 seedInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') applySeed();
@@ -194,23 +214,41 @@ function applySeed() {
   history.replaceState({}, '', nextUrl);
 }
 
+function cycleCircuit() {
+  const playable = getPlayableCircuits();
+  const index = playable.findIndex((circuit) => circuit.id === currentCircuit.id);
+  const next = playable[(index + 1 + playable.length) % playable.length];
+  navigateToCircuit(next, Number(seedInput.value) || initialSeed);
+}
+
 function prepareNextRound() {
-  const seed = season.suggestSeed();
-  seedInput.value = String(seed);
-  broadcastHistory = [];
-  renderBroadcastHistory();
-  engine.setSeed(seed);
+  const round = season.getNextRoundNumber();
+  const nextCircuit = getCircuitForRound(round);
+  if (!nextCircuit || nextCircuit.status !== 'playable') {
+    seasonPanelEl.classList.add('visible');
+    window.alert(nextCircuit
+      ? `${nextCircuit.name} is registered for Round ${round}, but its physical circuit module is still planned.`
+      : `Round ${round} is not registered yet.`);
+    return;
+  }
+  navigateToCircuit(nextCircuit, season.suggestSeed());
+}
+
+function navigateToCircuit(circuit: CircuitDefinition, seed: number) {
   const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set('circuit', circuit.id);
   nextUrl.searchParams.set('seed', String(seed));
-  history.replaceState({}, '', nextUrl);
-  renderRoundMeta();
+  window.location.assign(nextUrl.toString());
 }
 
 function renderSnapshot(snapshot: RaceSnapshot) {
   if (snapshot.state === 'finished' && previousRaceState !== 'finished' && snapshot.receipt) {
-    season.recordRace(snapshot.receipt, snapshot.standings, ACTIVE_CIRCUIT);
-    renderSeasonPanel();
-    renderRoundMeta();
+    const championshipRound = season.getNextRoundNumber();
+    if (currentCircuit.seasonRound === championshipRound) {
+      season.recordRace(snapshot.receipt, snapshot.standings, currentCircuit);
+      renderSeasonPanel();
+      renderRoundMeta();
+    }
   }
   previousRaceState = snapshot.state;
 
@@ -242,10 +280,14 @@ function renderSnapshot(snapshot: RaceSnapshot) {
     || snapshot.state === 'countdown'
     || snapshot.state === 'running'
     || snapshot.replayActive;
-  startButton.textContent = snapshot.state === 'finished' ? 'RACE AGAIN' : 'START BROADCAST';
+  const nextScheduled = getCircuitForRound(season.getNextRoundNumber());
+  const rerunIsExhibition = snapshot.state === 'finished' && currentCircuit.seasonRound < season.getNextRoundNumber();
+  startButton.textContent = rerunIsExhibition ? 'RERUN EXHIBITION' : snapshot.state === 'finished' ? 'RACE AGAIN' : 'START BROADCAST';
   startButton.disabled = raceBusy;
   replayButton.disabled = !snapshot.replayAvailable || snapshot.replayActive || snapshot.state !== 'finished';
-  nextRoundButton.disabled = snapshot.state !== 'finished' || snapshot.replayActive;
+  nextRoundButton.disabled = snapshot.state !== 'finished'
+    || snapshot.replayActive
+    || nextScheduled?.status !== 'playable';
 
   standingsEl.innerHTML = snapshot.standings.map((standing) => {
     const time = standing.finished && standing.finishTime !== undefined
@@ -285,12 +327,14 @@ function renderReceipt(receipt?: RaceReceipt) {
     <div class="receipt-title">PARALLAX RACE RECEIPT · BRBC PRODUCTION LOG</div>
     <div class="receipt-winner">${escapeHtml(receipt.winner)}</div>
     <div class="receipt-grid">
+      <span>CIRCUIT</span><b>${escapeHtml(currentCircuit.shortName)}</b>
       <span>WIN TIME</span><b>${winningTime}</b>
       <span>MARGIN</span><b>${margin}</b>
       <span>PHOTO FINISH</span><b>${receipt.photoFinish ? 'YES' : 'NO'}</b>
       <span>LEAD CHANGES</span><b>${receipt.leadChanges}</b>
       <span>OVERTAKES CALLED</span><b>${receipt.overtakes}</b>
       <span>BRBC COLLISIONS</span><b>${receipt.collisionEvents}</b>
+      <span>RECOVERY MARSHAL</span><b>${receipt.recoveryInterventions}</b>
       <span>DIRECTOR CUTS</span><b>${receipt.directorCuts}</b>
       <span>BROADCAST LINES</span><b>${receipt.broadcastLines}</b>
       <span>REPLAY FRAMES</span><b>${receipt.replayFrames}</b>
@@ -298,7 +342,7 @@ function renderReceipt(receipt?: RaceReceipt) {
       <span>FINISHERS</span><b>${receipt.finishers}/12</b>
       <span>SEED</span><b>${receipt.seed}</b>
     </div>
-    <div class="receipt-rule">SIMULATION AUTHORITATIVE · DIRECTOR OBSERVATIONAL · REPLAY VISUAL ONLY</div>
+    <div class="receipt-rule">SIMULATION AUTHORITATIVE · RECOVERY IMPULSES RECEIPTED · REPLAY VISUAL ONLY</div>
   `;
   receiptEl.classList.add('visible');
 }
@@ -309,6 +353,8 @@ function renderSeasonPanel() {
   const teams = season.getTeamStandings();
   const leader = drivers[0];
   const latest = state.races.at(-1);
+  const nextRound = season.getNextRoundNumber();
+  const nextCircuit = getCircuitForRound(nextRound);
   const driverRows = drivers.slice(0, 6).map((driver, index) => `
     <div class="champ-row">
       <b>${index + 1}</b><i>${escapeHtml(driver.code)}</i>
@@ -335,6 +381,7 @@ function renderSeasonPanel() {
       <div class="season-stat"><span>LEADER</span><b>${escapeHtml(leader?.code ?? '—')}</b></div>
       <div class="season-stat"><span>LAST WIN</span><b>${escapeHtml(latest?.results[0]?.code ?? '—')}</b></div>
     </div>
+    <div class="season-section"><div class="season-section-title">NEXT EVENT · ROUND ${nextRound}</div><div class="empty-season">${escapeHtml(nextCircuit?.name ?? 'UNREGISTERED')} · ${nextCircuit?.status === 'playable' ? 'PLAYABLE' : 'PLANNED'}</div></div>
     <div class="season-section"><div class="season-section-title">DRIVER CHAMPIONSHIP · 25–18–15–12–10–8–6–4–2–1</div><div class="champ-list">${driverRows}</div></div>
     <div class="season-section"><div class="season-section-title">TEAM CHAMPIONSHIP</div><div class="champ-list">${teamRows}</div></div>
     <div class="season-section"><div class="season-section-title">RECEIPT HISTORY</div><div class="race-history">${historyRows || '<div class="empty-season">NO RACES RECORDED YET</div>'}</div></div>
@@ -350,19 +397,20 @@ function renderSeasonPanel() {
   seasonPanelEl.querySelector<HTMLButtonElement>('#reset-season')?.addEventListener('click', () => {
     if (!window.confirm('Start a new Parallax Gran Prix season? The current local season standings will be cleared. Export the ledger first if you want to keep a copy.')) return;
     season.resetSeason();
-    const seed = season.suggestSeed();
-    engine.setSeed(seed);
-    renderSeasonPanel();
-    renderRoundMeta();
+    const opener = getCircuitForRound(1) ?? getPlayableCircuits()[0];
+    if (opener) navigateToCircuit(opener, season.suggestSeed());
   });
 }
 
 function renderRoundMeta() {
   const state = season.getState();
   const round = season.getNextRoundNumber();
-  const label = `SEASON ${state.seasonNumber} · ROUND ${round}`;
+  const scheduled = currentCircuit.seasonRound === round;
+  const label = scheduled
+    ? `SEASON ${state.seasonNumber} · ROUND ${round}`
+    : `SEASON ${state.seasonNumber} · EXHIBITION`;
   gridKickerEl.textContent = label;
-  roundChipEl.textContent = `${label} · ${ACTIVE_CIRCUIT.shortName.toUpperCase()}`;
+  roundChipEl.textContent = `${label} · ${currentCircuit.shortName.toUpperCase()}`;
 }
 
 function exportSeasonLedger() {

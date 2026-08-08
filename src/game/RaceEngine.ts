@@ -16,6 +16,8 @@ import {
   type DirectorShot
 } from './BroadcastDirector';
 import { ReplayBuffer, type ReplayFrame, type ReplayPose } from './ReplayBuffer';
+import { CircuitRuntime } from './circuits/CircuitRuntime';
+import { getCircuitModule, type CircuitModule } from './circuits/CircuitEngine';
 
 export type RaceState = 'ready' | 'grid' | 'countdown' | 'running' | 'finished';
 export type CameraMode = 'auto' | 'chase' | 'wide' | 'finish';
@@ -53,6 +55,7 @@ export type Standing = {
 };
 
 export type RaceReceipt = {
+  circuitId: string;
   seed: number;
   winner: string;
   winningTime: number | null;
@@ -61,6 +64,7 @@ export type RaceReceipt = {
   leadChanges: number;
   overtakes: number;
   collisionEvents: number;
+  recoveryInterventions: number;
   directorCuts: number;
   broadcastLines: number;
   replayFrames: number;
@@ -98,6 +102,7 @@ export type BroadcastMessage = {
 
 type RaceEngineOptions = {
   seed?: number;
+  circuitId?: string;
   onSnapshot?: (snapshot: RaceSnapshot) => void;
   onBroadcast?: (message: BroadcastMessage) => void;
 };
@@ -135,6 +140,7 @@ export class RaceEngine {
   private rotors: RotorRuntime[] = [];
   private finished: RacerRuntime[] = [];
   private splitChoices = new Map<string, 'LEFT' | 'RIGHT'>();
+  private circuit!: CircuitModule;
   private director = new BroadcastDirector();
   private directorDecision: DirectorDecision = { shot: 'grid-wide', focusIds: [], events: [] };
   private replayBuffer = new ReplayBuffer(RACE.replayWindowSeconds * 1000, 50);
@@ -160,6 +166,8 @@ export class RaceEngine {
   private leadChanges = 0;
   private overtakeEvents = 0;
   private collisionEvents = 0;
+  private recoveryInterventions = 0;
+  private progressWatch = new Map<string, { z: number; at: number }>();
   private directorCuts = 0;
   private broadcastLines = 0;
   private photoFinishAnnounced = false;
@@ -177,6 +185,7 @@ export class RaceEngine {
   ) {
     this.seed = options.seed ?? Math.floor(Date.now() % 1_000_000_000);
     this.random = new SeededRandom(this.seed);
+    this.circuit = getCircuitModule(options.circuitId ?? 'battlecase');
 
     this.scene.background = new THREE.Color(0x03060d);
     this.scene.fog = new THREE.FogExp2(0x03060d, 0.0105);
@@ -216,7 +225,7 @@ export class RaceEngine {
     this.gridStartMs = now;
     this.broadcastQueue = [];
     this.lastQueuedDue = now;
-    this.enqueueConversation('opening', undefined, true);
+    this.enqueueConversation('opening', this.circuit.name, true);
     this.emitSnapshot(now);
   }
 
@@ -226,6 +235,7 @@ export class RaceEngine {
     this.state = 'ready';
     this.finished = [];
     this.splitChoices.clear();
+    this.progressWatch.clear();
     this.director.reset();
     this.directorDecision = { shot: 'grid-wide', focusIds: [], events: [] };
     this.replayBuffer.reset();
@@ -240,6 +250,7 @@ export class RaceEngine {
     this.leadChanges = 0;
     this.overtakeEvents = 0;
     this.collisionEvents = 0;
+    this.recoveryInterventions = 0;
     this.directorCuts = 0;
     this.broadcastLines = 0;
     this.photoFinishAnnounced = false;
@@ -312,57 +323,13 @@ export class RaceEngine {
   }
 
   private buildCircuit() {
-    const floorMaterial = new CANNON.Material('track');
-    const marbleMaterial = new CANNON.Material('marble');
-    this.world.defaultContactMaterial.friction = 0.23;
-    this.world.defaultContactMaterial.restitution = 0.24;
-    this.world.addContactMaterial(new CANNON.ContactMaterial(floorMaterial, marbleMaterial, {
-      friction: 0.31,
-      restitution: 0.24
-    }));
-
-    const floorBody = new CANNON.Body({
-      mass: 0,
-      material: floorMaterial,
-      shape: new CANNON.Box(new CANNON.Vec3(RACE.trackWidth / 2, RACE.floorHalfHeight, RACE.trackLength / 2))
-    });
-    floorBody.quaternion.setFromEuler(RACE.slopeRadians, 0, 0);
-    this.world.addBody(floorBody);
-
-    const floorMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(RACE.trackWidth, RACE.floorHalfHeight * 2, RACE.trackLength),
-      new THREE.MeshStandardMaterial({ color: 0x0a1420, metalness: 0.8, roughness: 0.32 })
-    );
-    floorMesh.rotation.x = RACE.slopeRadians;
-    this.scene.add(floorMesh);
-
-    this.addMotherboardTraces();
-    this.addRail(-RACE.trackWidth / 2 - 0.25, floorMaterial);
-    this.addRail(RACE.trackWidth / 2 + 0.25, floorMaterial);
-
-    [
-      [-5.2, -27, 5.1, 2.2],
-      [5.0, -21, 5.4, 2.2],
-      [-4.4, -15.5, 4.6, 1.8]
-    ].forEach(([x, z, width, depth], index) => this.addObstacle(x, z, width, depth, index));
-
-    this.addRotor(-7, -0.7, 7.4, 1.25);
-    this.addBumper(-5.7, -1.2, 1.15, 0x164d63);
-    this.addBumper(5.8, 2.0, 1.15, 0x164d63);
-    this.addRotor(5.2, 0.8, 7.0, -1.05);
-
-    this.addSplitDivider();
-    this.addBumper(-5.8, 27.5, 1.0, 0x6b2c85);
-    this.addBumper(5.8, 25.0, 1.0, 0x6b2c85);
-    this.addObstacle(-5.4, 36.5, 3.7, 1.3, 4);
-    this.addObstacle(5.2, 42.0, 3.7, 1.3, 5);
-
-    this.addSectorMarkers();
-    this.addFinishGate();
-    this.addDecor();
-    (this.world as CANNON.World & { __pgpMarbleMaterial?: CANNON.Material }).__pgpMarbleMaterial = marbleMaterial;
+    const runtime = new CircuitRuntime(this.scene, this.world, this.random, this.circuit.sectors);
+    this.circuit.build(runtime);
+    this.rotors = runtime.rotors;
   }
 
+  // Legacy Battlecase geometry helpers remain temporarily during Slice 5 migration.
+  // The active race path now builds through CircuitRuntime + CircuitModule above.
   private addMotherboardTraces() {
     const cyan = new THREE.MeshBasicMaterial({ color: 0x1ec8ff, transparent: true, opacity: 0.34 });
     const gold = new THREE.MeshBasicMaterial({ color: 0xe0a94c, transparent: true, opacity: 0.24 });
@@ -713,6 +680,7 @@ export class RaceEngine {
     this.state = 'running';
     this.raceStartMs = now;
     this.raceEndMs = 0;
+    this.progressWatch.clear();
     this.racers.forEach((racer, index) => {
       racer.body.wakeUp();
       racer.body.velocity.set(
@@ -725,8 +693,9 @@ export class RaceEngine {
         this.random.range(-1.4, 1.4),
         this.random.range(-2.4, 2.4)
       );
+      this.progressWatch.set(racer.def.id, { z: racer.body.position.z, at: now });
     });
-    this.enqueueConversation('start', undefined, true);
+    this.enqueueConversation('start', this.circuit.name, true);
   }
 
   private animate = (now: number) => {
@@ -749,6 +718,7 @@ export class RaceEngine {
     if (this.state === 'running') {
       this.world.step(RACE.fixedTimeStep, dt, RACE.maxSubSteps);
       this.checkFinishers(now);
+      this.checkStalls(now);
       this.captureReplay(now);
       this.checkLeader();
       this.checkSector();
@@ -784,6 +754,33 @@ export class RaceEngine {
         rotor.body.quaternion.z,
         rotor.body.quaternion.w
       );
+    });
+  }
+
+  private checkStalls(now: number) {
+    const stallMs = RACE.recoveryStallSeconds * 1000;
+    this.racers.forEach((racer) => {
+      if (racer.finishPlace) return;
+      const watch = this.progressWatch.get(racer.def.id) ?? { z: racer.body.position.z, at: now };
+      const forwardProgress = racer.body.position.z - watch.z;
+
+      if (forwardProgress >= RACE.recoveryMinProgress) {
+        this.progressWatch.set(racer.def.id, { z: racer.body.position.z, at: now });
+        return;
+      }
+
+      if (now - watch.at < stallMs) return;
+      if (racer.body.velocity.length() > RACE.recoverySpeedThreshold) return;
+
+      const centerBias = racer.body.position.x === 0
+        ? (racer.def.id.charCodeAt(0) % 2 ? 1 : -1)
+        : -Math.sign(racer.body.position.x);
+      const lateral = centerBias * (0.85 + (racer.def.id.length % 3) * 0.12);
+      racer.body.wakeUp();
+      racer.body.applyImpulse(new CANNON.Vec3(lateral, 0.14, 2.8), racer.body.position);
+      this.recoveryInterventions += 1;
+      this.progressWatch.set(racer.def.id, { z: racer.body.position.z, at: now });
+      this.enqueueConversation('recovery', `${racer.def.name} receives physical recovery impulse #${this.recoveryInterventions}`);
     });
   }
 
@@ -907,6 +904,7 @@ export class RaceEngine {
     const choices = [...this.splitChoices.values()];
 
     return {
+      circuitId: this.circuit.id,
       seed: this.seed,
       winner: first?.def.name ?? 'NO FINISHER',
       winningTime,
@@ -915,6 +913,7 @@ export class RaceEngine {
       leadChanges: this.leadChanges,
       overtakes: this.overtakeEvents,
       collisionEvents: this.collisionEvents,
+      recoveryInterventions: this.recoveryInterventions,
       directorCuts: this.directorCuts,
       broadcastLines: this.broadcastLines,
       replayFrames: this.replayFrames.length,
@@ -949,9 +948,11 @@ export class RaceEngine {
   }
 
   private checkSplitChoices() {
+    const split = this.circuit.splitWindow;
+    if (!split) return;
     this.racers.forEach((racer) => {
       if (this.splitChoices.has(racer.def.id)) return;
-      if (racer.body.position.z < 10.5 || racer.body.position.z > 16) return;
+      if (racer.body.position.z < split.startZ || racer.body.position.z > split.endZ) return;
       const choice = racer.body.position.x < 0 ? 'LEFT' : 'RIGHT';
       this.splitChoices.set(racer.def.id, choice);
       if (!this.splitAnnounced) {
@@ -1095,9 +1096,10 @@ export class RaceEngine {
     }
 
     if (shot === 'split-overhead') {
-      const desired = new THREE.Vector3(0, 31, 18);
+      const splitZ = this.circuit.splitCameraZ ?? 21;
+      const desired = new THREE.Vector3(0, 31, splitZ - 3);
       this.camera.position.lerp(desired, 0.05);
-      this.camera.lookAt(0, this.trackHeightAt(22), 22);
+      this.camera.lookAt(0, this.trackHeightAt(splitZ) + 0.4, splitZ + 1);
       return;
     }
 
@@ -1177,8 +1179,9 @@ export class RaceEngine {
   }
 
   private sectorAt(z: number) {
-    return SECTORS.find((sector) => z >= sector.startZ && z < sector.endZ)
-      ?? SECTORS[SECTORS.length - 1];
+    const sectors = this.circuit.sectors.length ? this.circuit.sectors : SECTORS;
+    return sectors.find((sector) => z >= sector.startZ && z < sector.endZ)
+      ?? sectors[sectors.length - 1];
   }
 
   private trackHeightAt(z: number) {
