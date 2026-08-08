@@ -1,5 +1,6 @@
 export type RacerDefinition = {
   id: string;
+  code: string;
   name: string;
   team: string;
   color: number;
@@ -7,18 +8,18 @@ export type RacerDefinition = {
 };
 
 export const RACERS: RacerDefinition[] = [
-  { id: 'carbon', name: 'Carbon', team: 'Carbon Racing', color: 0x20242a, accent: 0xd8d8d8 },
-  { id: 'silicon', name: 'Silicon', team: 'Silicon Velocity', color: 0x0a3d62, accent: 0x39c6ff },
-  { id: 'dreamer', name: 'Dreamer', team: 'Dreamer Motorsport', color: 0x6c2bd9, accent: 0xff66d8 },
-  { id: 'mirror', name: 'Mirror', team: 'Mirror Works', color: 0xbfc7d5, accent: 0xffffff },
-  { id: 'wave-rider', name: 'Wave Rider', team: 'Wave Rider', color: 0x1261a0, accent: 0x73dcff },
-  { id: 'governotter', name: 'GovernOtter', team: 'GovernOtter Works Team', color: 0x163c63, accent: 0xd6ad60 },
-  { id: 'chimp-monk', name: 'Chimp Monk', team: 'Chimp Monk Racing', color: 0x5e1212, accent: 0xff5c35 },
-  { id: 'chick-monk', name: 'Chick Monk', team: 'Chick Monk Racing', color: 0xf1bd22, accent: 0xffed8a },
-  { id: 'ledger-larry', name: 'Ledger Larry', team: 'Ledger Racing Authority', color: 0x356149, accent: 0xcaa65a },
-  { id: 'battlecase', name: 'Battlecase', team: 'Battlecase Works', color: 0x383b43, accent: 0xffb23e },
-  { id: 'builder', name: 'Builder', team: 'Builder Works', color: 0xc77818, accent: 0xffda61 },
-  { id: 'reality-ledger', name: 'Reality Ledger', team: 'Reality Ledger', color: 0x251b4d, accent: 0x8bf0ff }
+  { id: 'carbon', code: 'CR', name: 'Carbon', team: 'Carbon Racing', color: 0x20242a, accent: 0xd8d8d8 },
+  { id: 'silicon', code: 'SV', name: 'Silicon', team: 'Silicon Velocity', color: 0x0a3d62, accent: 0x39c6ff },
+  { id: 'dreamer', code: 'DM', name: 'Dreamer', team: 'Dreamer Motorsport', color: 0x6c2bd9, accent: 0xff66d8 },
+  { id: 'mirror', code: 'MW', name: 'Mirror', team: 'Mirror Works', color: 0xbfc7d5, accent: 0xffffff },
+  { id: 'wave-rider', code: 'WR', name: 'Wave Rider', team: 'Wave Rider', color: 0x1261a0, accent: 0x73dcff },
+  { id: 'governotter', code: 'GO', name: 'GovernOtter', team: 'GovernOtter Works Team', color: 0x163c63, accent: 0xd6ad60 },
+  { id: 'chimp-monk', code: 'CM', name: 'Chimp Monk', team: 'Chimp Monk Racing', color: 0x5e1212, accent: 0xff5c35 },
+  { id: 'chick-monk', code: 'CK', name: 'Chick Monk', team: 'Chick Monk Racing', color: 0xf1bd22, accent: 0xffed8a },
+  { id: 'ledger-larry', code: 'LL', name: 'Ledger Larry', team: 'Ledger Racing Authority', color: 0x356149, accent: 0xcaa65a },
+  { id: 'battlecase', code: 'BC', name: 'Battlecase', team: 'Battlecase Works', color: 0x383b43, accent: 0xffb23e },
+  { id: 'builder', code: 'BU', name: 'Builder', team: 'Builder Works', color: 0xc77818, accent: 0xffda61 },
+  { id: 'reality-ledger', code: 'RL', name: 'Reality Ledger', team: 'Reality Ledger', color: 0x251b4d, accent: 0x8bf0ff }
 ];
 
 export const RACE = {
@@ -29,10 +30,14 @@ export const RACE = {
   marbleRadius: 0.72,
   startZ: -50,
   finishZ: 50,
+  gridPresentationSeconds: 2.7,
   countdownSeconds: 3,
   fixedTimeStep: 1 / 60,
   maxSubSteps: 5,
-  photoFinishThreshold: 0.22
+  photoFinishThreshold: 0.22,
+  replayWindowSeconds: 5.2,
+  replayPlaybackRate: 0.42,
+  raceTimeoutSeconds: 55
 } as const;
 
 export const SECTORS = [
@@ -43,55 +48,128 @@ export const SECTORS = [
   { id: 'sprint', name: 'MOTHERBOARD SPRINT', startZ: 31, endZ: 50 }
 ] as const;
 
+export type BrbcSpeaker = 'THREVE' | "SIX'T" | 'NOINE';
+
 export type BroadcastEventType =
+  | 'opening'
   | 'start'
   | 'lead-change'
+  | 'overtake'
+  | 'battle'
   | 'collision'
   | 'sector'
   | 'split'
+  | 'final-ten'
   | 'finish'
   | 'photo-finish'
-  | 'winner';
+  | 'winner'
+  | 'replay';
 
-export const BRBC_LINES: Record<BroadcastEventType, string[]> = {
+export type BroadcastBeat = {
+  speaker: BrbcSpeaker;
+  text: string;
+};
+
+export const BRBC_EXCHANGES: Record<BroadcastEventType, BroadcastBeat[][]> = {
+  opening: [
+    [
+      { speaker: 'THREVE', text: 'Good evening, field-watchers! Twelve vessels are locked into Battlecase Circuit!' },
+      { speaker: "SIX'T", text: 'Seed committed. Physics authoritative. Cooling sweepers are already rotating.' },
+      { speaker: 'NOINE', text: 'Splendid. Release the marbles.' }
+    ]
+  ],
   start: [
-    "THREVE: And we're rolling! Welcome to the Parallax Gran Prix!",
-    "SIX'T: Initial field vectors stable. Mostly.",
-    "NOINE: Quite."
+    [
+      { speaker: 'THREVE', text: "AND WE'RE ROLLING! PARALLAX GRAN PRIX IS GO!" },
+      { speaker: "SIX'T", text: 'Initial velocity field is compressing toward GPU Canyon.' },
+      { speaker: 'NOINE', text: 'Try the brakes. Oh. Right.' }
+    ]
   ],
   'lead-change': [
-    'THREVE: NEW LEADER! Look at that vessel move!',
-    "SIX'T: Route delta just changed dramatically.",
-    'NOINE: Ambitious.'
+    [
+      { speaker: 'THREVE', text: 'NEW LEADER — {detail}!' },
+      { speaker: "SIX'T", text: 'That position change is confirmed in the live ordering.' },
+      { speaker: 'NOINE', text: 'Ambitious.' }
+    ]
+  ],
+  overtake: [
+    [
+      { speaker: 'THREVE', text: 'HE HAS GONE THROUGH! {detail}!' },
+      { speaker: "SIX'T", text: 'Clean positional gain. No steward intervention required.' },
+      { speaker: 'NOINE', text: 'Rather well pinched.' }
+    ],
+    [
+      { speaker: 'THREVE', text: 'AROUND THE OUTSIDE — LOOK AT THIS! {detail}!' },
+      { speaker: "SIX'T", text: 'Momentum transfer held through contact. Barely.' },
+      { speaker: 'NOINE', text: 'Still counts.' }
+    ]
+  ],
+  battle: [
+    [
+      { speaker: 'THREVE', text: 'WE HAVE A PROPER SCRAP HERE — {detail}!' },
+      { speaker: "SIX'T", text: 'The gap is inside our battle threshold. Director is taking the two-shot.' },
+      { speaker: 'NOINE', text: 'No elbows, please.' }
+    ]
   ],
   collision: [
-    'THREVE: ABSOLUTE SCENES IN THE BATTLECASE!',
-    "SIX'T: That was an entirely measurable catastrophe.",
-    'NOINE: Bit untidy.'
+    [
+      { speaker: 'THREVE', text: 'ABSOLUTE SCENES — {detail} HAS FOUND THE FURNITURE!' },
+      { speaker: "SIX'T", text: 'That was an entirely measurable catastrophe.' },
+      { speaker: 'NOINE', text: 'Bit untidy.' }
+    ]
   ],
   sector: [
-    'THREVE: INTO THE NEXT SECTOR THEY GO!',
-    "SIX'T: New geometry. New risk profile.",
-    'NOINE: Carry on.'
+    [
+      { speaker: 'THREVE', text: 'INTO {detail} THEY GO!' },
+      { speaker: "SIX'T", text: 'New geometry. New risk profile.' },
+      { speaker: 'NOINE', text: 'Carry on.' }
+    ]
   ],
   split: [
-    'THREVE: THE PARALLAX SPLIT! PICK A SIDE!',
-    "SIX'T: Divergent routes confirmed. Outcome unresolved.",
-    'NOINE: Decisions, decisions.'
+    [
+      { speaker: 'THREVE', text: 'THE PARALLAX SPLIT! {detail}!' },
+      { speaker: "SIX'T", text: 'Divergent routes confirmed. Outcome unresolved.' },
+      { speaker: 'NOINE', text: 'Decisions, decisions.' }
+    ]
+  ],
+  'final-ten': [
+    [
+      { speaker: 'THREVE', text: 'HERE WE GO — FINAL CHARGE — WOTWOTBLIMEYGOOOO — {detail}!' },
+      { speaker: "SIX'T", text: 'Velocity delta is—GOOD LORD—never mind the chart, GO ON THEN!' },
+      { speaker: 'NOINE', text: 'RRRAAH-JOLLY-BLAAAAH-WOT-WOT— ... Quite.' }
+    ],
+    [
+      { speaker: 'THREVE', text: 'TEN-SECOND ENERGY NOW — OIYAHBLIMEYFJOOOORGH — {detail}!' },
+      { speaker: "SIX'T", text: 'I appear to have stopped doing mathematics.' },
+      { speaker: 'NOINE', text: 'Understandable.' }
+    ]
   ],
   finish: [
-    'THREVE: ONE ACROSS! WHO IS NEXT?!',
-    "SIX'T: Finish telemetry confirmed.",
-    'NOINE: Splendid.'
+    [
+      { speaker: 'THREVE', text: 'ONE ACROSS! {detail}!' },
+      { speaker: "SIX'T", text: 'Finish telemetry confirmed.' },
+      { speaker: 'NOINE', text: 'Splendid.' }
+    ]
   ],
   'photo-finish': [
-    'THREVE: THAT IS TOO CLOSE TO CALL WITH EYEBALLS!',
-    "SIX'T: Milliseconds. We require the receipt.",
-    'NOINE: Rather close.'
+    [
+      { speaker: 'THREVE', text: 'THAT IS TOO CLOSE TO CALL WITH EYEBALLS — {detail}!' },
+      { speaker: "SIX'T", text: 'Milliseconds. We require the receipt and the finish replay.' },
+      { speaker: 'NOINE', text: 'Rather close.' }
+    ]
   ],
   winner: [
-    'THREVE: WE HAVE A WINNER! GOOD HEAVENS!',
-    "SIX'T: The simulation has rendered its verdict.",
-    'NOINE: Quite.'
+    [
+      { speaker: 'THREVE', text: 'WE HAVE A WINNER! {detail}! GOOD HEAVENS!' },
+      { speaker: "SIX'T", text: 'The simulation has rendered its verdict.' },
+      { speaker: 'NOINE', text: 'Quite.' }
+    ]
+  ],
+  replay: [
+    [
+      { speaker: 'THREVE', text: 'ROLL THE BRBC FINISH REPLAY!' },
+      { speaker: "SIX'T", text: 'Recorded poses only. Physics state remains untouched.' },
+      { speaker: 'NOINE', text: 'Again, but slower.' }
+    ]
   ]
 };
