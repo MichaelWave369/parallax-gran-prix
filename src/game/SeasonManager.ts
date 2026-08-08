@@ -147,6 +147,8 @@ export class SeasonManager {
     weekend?: EventWeekendReceipt
   ) {
     const round = this.getNextRoundNumber();
+    if (circuit.seasonRound !== round) return undefined;
+
     const record: SeasonRaceRecord = {
       id: `S${this.state.seasonNumber}-R${round}-${receipt.seed}`,
       seasonNumber: this.state.seasonNumber,
@@ -392,6 +394,7 @@ export class SeasonManager {
       pointsSystem: [...POINTS],
       dnfRule: 'DNF results receive zero championship points.',
       qualifyingRule: 'Championship qualifying sets the starting grid only. The feature race remains physics-authoritative after launch.',
+      seasonWriteRule: 'Only the circuit scheduled for the current championship round may be recorded by SeasonManager.',
       season: this.state,
       drivers: this.getDriverStandings(),
       teams: this.getTeamStandings(),
