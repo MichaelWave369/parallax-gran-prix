@@ -23,22 +23,34 @@ export const RACERS: RacerDefinition[] = [
 
 export const RACE = {
   trackWidth: 18,
-  trackLength: 86,
-  slopeRadians: 0.075,
+  trackLength: 112,
+  slopeRadians: 0.064,
   floorHalfHeight: 0.45,
   marbleRadius: 0.72,
-  startZ: -37,
-  finishZ: 37,
+  startZ: -50,
+  finishZ: 50,
   countdownSeconds: 3,
   fixedTimeStep: 1 / 60,
-  maxSubSteps: 4
+  maxSubSteps: 5,
+  photoFinishThreshold: 0.22
 } as const;
+
+export const SECTORS = [
+  { id: 'boot', name: 'BOOT STRAIGHT', startZ: -50, endZ: -31 },
+  { id: 'gpu', name: 'GPU CANYON', startZ: -31, endZ: -13 },
+  { id: 'cooling', name: 'COOLING GAUNTLET', startZ: -13, endZ: 9 },
+  { id: 'split', name: 'PARALLAX SPLIT', startZ: 9, endZ: 31 },
+  { id: 'sprint', name: 'MOTHERBOARD SPRINT', startZ: 31, endZ: 50 }
+] as const;
 
 export type BroadcastEventType =
   | 'start'
   | 'lead-change'
   | 'collision'
+  | 'sector'
+  | 'split'
   | 'finish'
+  | 'photo-finish'
   | 'winner';
 
 export const BRBC_LINES: Record<BroadcastEventType, string[]> = {
@@ -57,10 +69,25 @@ export const BRBC_LINES: Record<BroadcastEventType, string[]> = {
     "SIX'T: That was an entirely measurable catastrophe.",
     'NOINE: Bit untidy.'
   ],
+  sector: [
+    'THREVE: INTO THE NEXT SECTOR THEY GO!',
+    "SIX'T: New geometry. New risk profile.",
+    'NOINE: Carry on.'
+  ],
+  split: [
+    'THREVE: THE PARALLAX SPLIT! PICK A SIDE!',
+    "SIX'T: Divergent routes confirmed. Outcome unresolved.",
+    'NOINE: Decisions, decisions.'
+  ],
   finish: [
     'THREVE: ONE ACROSS! WHO IS NEXT?!',
     "SIX'T: Finish telemetry confirmed.",
     'NOINE: Splendid.'
+  ],
+  'photo-finish': [
+    'THREVE: THAT IS TOO CLOSE TO CALL WITH EYEBALLS!',
+    "SIX'T: Milliseconds. We require the receipt.",
+    'NOINE: Rather close.'
   ],
   winner: [
     'THREVE: WE HAVE A WINNER! GOOD HEAVENS!',
