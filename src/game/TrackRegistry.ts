@@ -13,6 +13,14 @@ export type SpeedTrapDefinition = {
   z: number;
 };
 
+export type CircuitBroadcastPackage = {
+  eventTitle: string;
+  kicker: string;
+  hazardNote: string;
+  trophy: string;
+  noineTag: string;
+};
+
 export type CircuitDefinition = {
   id: string;
   name: string;
@@ -22,6 +30,7 @@ export type CircuitDefinition = {
   description: string;
   sectors: readonly CircuitSector[];
   speedTraps?: readonly SpeedTrapDefinition[];
+  broadcast?: CircuitBroadcastPackage;
   features: readonly string[];
 };
 
@@ -57,6 +66,14 @@ export const MIRROR_SECTORS: readonly CircuitSector[] = [
   { id: 'prism', name: 'PRISM SPRINT', startZ: 31, endZ: 50 }
 ] as const;
 
+export const LEDGER_LARRY_SECTORS: readonly CircuitSector[] = [
+  { id: 'inbox', name: 'INBOX INTAKE', startZ: -50, endZ: -31 },
+  { id: 'carbon', name: 'CARBON ROLLERS', startZ: -31, endZ: -11 },
+  { id: 'audit', name: 'AUDIT GATES', startZ: -11, endZ: 10 },
+  { id: 'split', name: 'DUPLICATE / TRIPLICATE', startZ: 10, endZ: 31 },
+  { id: 'dispatch', name: 'PNEUMATIC DISPATCH', startZ: 31, endZ: 50 }
+] as const;
+
 export const CIRCUITS: CircuitDefinition[] = [
   {
     id: 'battlecase',
@@ -70,6 +87,13 @@ export const CIRCUITS: CircuitDefinition[] = [
       { id: 'gpu-exit', name: 'GPU EXIT', z: -14 },
       { id: 'board-speed', name: 'BOARD SPEED', z: 42 }
     ],
+    broadcast: {
+      eventTitle: 'BATTLECASE CIRCUIT GRAND PRIX',
+      kicker: 'BOOT. BUILD. BREAK AWAY.',
+      hazardNote: 'GPU canyon, cooling sweepers, and the physical Parallax Split.',
+      trophy: 'THE GOLDEN BOOT SECTOR',
+      noineTag: 'Hardware appears committed.'
+    },
     features: ['gpu-canyon', 'cooling-gauntlet', 'parallax-split', 'speed-traps', 'finish-replay', 'recovery-marshal']
   },
   {
@@ -84,6 +108,13 @@ export const CIRCUITS: CircuitDefinition[] = [
       { id: 'groove-trap', name: 'GROOVE TRAP', z: -12 },
       { id: 'speaker-trap', name: 'SPEAKER TRAP', z: 42 }
     ],
+    broadcast: {
+      eventTitle: "BACKSPIN '96 CLASSIC",
+      kicker: 'TWO DECKS. ONE FINISH.',
+      hazardNote: 'Platter grooves, inverse tonearms, crossfader split, and speaker kickers.',
+      trophy: 'THE GOLDEN CROSSFADER',
+      noineTag: 'Bit musical.'
+    },
     features: ['turntables', 'tonearms', 'crossfader', 'speaker-kickers', 'speed-traps', 'finish-replay', 'recovery-marshal']
   },
   {
@@ -98,6 +129,13 @@ export const CIRCUITS: CircuitDefinition[] = [
       { id: 'pinion-trap', name: 'PINION TRAP', z: -12 },
       { id: 'output-trap', name: 'OUTPUT TRAP', z: 42 }
     ],
+    broadcast: {
+      eventTitle: 'SPAUNGEAR WORKS 500',
+      kicker: 'MESH CLEAN OR GET MACHINED.',
+      hazardNote: 'Pinion timing bars, transfer gates, crown mesh, and output-shaft traffic.',
+      trophy: 'THE BRASS CROWN GEAR',
+      noineTag: 'Presumably inspected.'
+    },
     features: ['gear-fields', 'transfer-gates', 'crown-mesh', 'timing-windows', 'speed-traps', 'finish-replay', 'recovery-marshal']
   },
   {
@@ -112,9 +150,36 @@ export const CIRCUITS: CircuitDefinition[] = [
       { id: 'symmetry-trap', name: 'SYMMETRY TRAP', z: -12 },
       { id: 'prism-trap', name: 'PRISM TRAP', z: 42 }
     ],
+    broadcast: {
+      eventTitle: 'MIRROR LABYRINTH REFLECTION CUP',
+      kicker: 'SAME FIELD. OPPOSITE ANSWERS.',
+      hazardNote: 'Symmetry hall, inverse sweepers, mirrored routes, and prism sprint.',
+      trophy: 'THE PRISM CROWN',
+      noineTag: 'I appear to be commentating on myself.'
+    },
     features: ['mirrors', 'symmetry-hall', 'inverse-gates', 'mirror-split', 'prism-sprint', 'speed-traps', 'finish-replay', 'recovery-marshal']
   },
-  { id: 'ledger-larry-500', name: 'Ledger Larry 500', shortName: 'Larry 500', status: 'planned', seasonRound: 5, description: 'Administrative machinery, paper rollers, stamps, and catastrophic accounting.', sectors: [], features: ['paperwork', 'audit-gates'] },
+  {
+    id: 'ledger-larry-500',
+    name: 'Ledger Larry 500',
+    shortName: 'Larry 500',
+    status: 'playable',
+    seasonRound: 5,
+    description: 'A catastrophic administrative race through carbon rollers, audit gates, duplicate routes, stamp arms, and pneumatic dispatch.',
+    sectors: LEDGER_LARRY_SECTORS,
+    speedTraps: [
+      { id: 'carbon-copy', name: 'CARBON COPY TRAP', z: -12 },
+      { id: 'dispatch-trap', name: 'DISPATCH TRAP', z: 42 }
+    ],
+    broadcast: {
+      eventTitle: 'LEDGER LARRY 500',
+      kicker: "HEY, WHERE'S MY CARBONS?",
+      hazardNote: 'Carbon-copy rollers, audit stamps, duplicate/triplicate split, and pneumatic dispatch.',
+      trophy: 'THE GOLDEN CARBON COPY',
+      noineTag: 'Receipts, naturally.'
+    },
+    features: ['paperwork', 'carbon-rollers', 'audit-gates', 'duplicate-split', 'pneumatic-dispatch', 'speed-traps', 'finish-replay', 'recovery-marshal']
+  },
   { id: 'phivessel-dream-run', name: 'PhiVessel Dream Run', shortName: 'Dream Run', status: 'planned', seasonRound: 6, description: 'Glowing geometry and shifting dream-state route logic.', sectors: [], features: ['dream-gates', 'dynamic-geometry'] },
   { id: 'carbon-loop', name: 'Carbon Loop', shortName: 'Carbon Loop', status: 'planned', seasonRound: 7, description: 'Feedback loops that can return racers to earlier sections.', sectors: [], features: ['loops', 'reentry'] },
   { id: 'data-center', name: 'Parallax Data Center', shortName: 'Data Center', status: 'planned', seasonRound: 8, description: 'Rack canyons, thermal channels, cooling tubes, and accelerator lanes.', sectors: [], features: ['thermal-lanes', 'rack-canyon'] },

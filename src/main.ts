@@ -2,7 +2,9 @@ import './styles.css';
 import './season.css';
 import './health.css';
 import './sporting.css';
+import './event.css';
 import { RACERS } from './game/config';
+import { EventWeekendManager, type WeekendPhase } from './game/EventWeekendManager';
 import { RaceHealthMonitor } from './game/RaceHealthMonitor';
 import { installSmartLabelDeclutter } from './game/SmartLabelDeclutter';
 import { SeasonManager, type CircuitRecords } from './game/SeasonManager';
@@ -28,7 +30,9 @@ if (!app) throw new Error('Missing #app root');
 const season = new SeasonManager();
 const health = new RaceHealthMonitor();
 const query = new URLSearchParams(window.location.search);
-const scheduledCircuit = getCircuitForRound(season.getNextRoundNumber());
+const seasonStateAtLoad = season.getState();
+const scheduledRoundAtLoad = season.getNextRoundNumber();
+const scheduledCircuit = getCircuitForRound(scheduledRoundAtLoad);
 const requestedCircuit = getCircuitById(query.get('circuit') ?? '');
 const currentCircuit = requestedCircuit?.status === 'playable'
   ? requestedCircuit
@@ -38,43 +42,79 @@ const currentCircuit = requestedCircuit?.status === 'playable'
 
 if (!currentCircuit) throw new Error('No playable Parallax Gran Prix circuit is registered');
 
+const championshipEligibleAtLoad = currentCircuit.seasonRound === scheduledRoundAtLoad;
+const querySeed = Number(query.get('seed'));
+const raceSeed = Number.isFinite(querySeed) && querySeed !== 0
+  ? Math.abs(Math.trunc(querySeed))
+  : season.suggestSeed();
+const eventTitle = currentCircuit.broadcast?.eventTitle ?? currentCircuit.name.toUpperCase();
+const weekend = new EventWeekendManager({
+  seasonNumber: seasonStateAtLoad.seasonNumber,
+  round: scheduledRoundAtLoad,
+  circuitId: currentCircuit.id,
+  eventTitle,
+  raceSeed,
+  championshipEligible: championshipEligibleAtLoad
+});
+let weekendPhase: WeekendPhase = weekend.getPhase(query.get('phase'));
+if (weekendPhase === 'race') weekend.applyGridOrder(RACERS);
+const initialSeed = weekend.getSessionSeed(weekendPhase);
+
 const sporting = new SportingIntelligence(currentCircuit);
 let historicalRecords = season.getCircuitRecords(currentCircuit.id);
 let careerAtGreen = season.getCareerStats();
 
-const querySeed = Number(query.get('seed'));
-const initialSeed = Number.isFinite(querySeed) && querySeed !== 0
-  ? Math.abs(Math.trunc(querySeed))
-  : season.suggestSeed();
-
-const gridCards = RACERS.map((racer, index) => `
-  <div class="grid-racer" style="--racer-accent:${hex(racer.accent)}">
-    <span>${String(index + 1).padStart(2, '0')}</span>
-    <b>${escapeHtml(racer.code)}</b>
-    <em>${escapeHtml(racer.name)}</em>
-  </div>
-`).join('');
+const qualifyingAtLoad = weekend.getQualifyingResult();
+const driverPointsAtLoad = new Map(season.getDriverStandings().map((driver) => [driver.id, driver.points]));
+const gridCards = RACERS.map((racer, index) => {
+  const qualifying = qualifyingAtLoad?.grid.find((row) => row.id === racer.id);
+  const cardPosition = weekendPhase === 'race' && qualifying ? qualifying.position : index + 1;
+  const qualifyingText = qualifying
+    ? qualifying.finished && qualifying.time !== null
+      ? `Q ${qualifying.time.toFixed(3)}s`
+      : `Q DNF · ${Math.round(qualifying.progress * 100)}%`
+    : weekendPhase === 'qualifying'
+      ? 'QUALIFYING ENTRY'
+      : 'EXHIBITION GRID';
+  return `
+    <div class="grid-racer" style="--racer-accent:${hex(racer.accent)}">
+      <span>${String(cardPosition).padStart(2, '0')}</span>
+      <b>${escapeHtml(racer.code)}</b>
+      <em>${escapeHtml(racer.name)}</em>
+      <small>${qualifyingText} · ${driverPointsAtLoad.get(racer.id) ?? 0} PTS</small>
+    </div>
+  `;
+}).join('');
 
 const courseKey = currentCircuit.sectors.slice(1).map((sector) => `<span>${escapeHtml(sector.name)}</span>`).join('');
 const firstSectorName = currentCircuit.sectors[0]?.name ?? 'START';
+const packageKicker = currentCircuit.broadcast?.kicker ?? currentCircuit.description;
 
 app.innerHTML = `
   <main class="shell">
     <section class="viewport" id="viewport">
-      <div class="live-bug"><i></i> BRBC LIVE</div>
+      <div class="live-bug"><i></i> BRBC LIVE <span class="event-session-tag" id="session-tag"></span></div>
       <div class="round-chip" id="round-chip"></div>
 
       <div class="brand">
         <div class="eyebrow">PARALLAX FIELD THEORY SPORTS · BRBC WORLD FEED</div>
         <h1>PARALLAX <span>GRAN PRIX</span></h1>
-        <p>${escapeHtml(currentCircuit.name.toUpperCase())} · SPORTING INTELLIGENCE SLICE</p>
+        <p>${escapeHtml(eventTitle)} · EVENT PRODUCTION</p>
+      </div>
+
+      <div class="event-strip" id="event-strip">
+        <div class="event-stat session"><span>SESSION</span><b id="event-session">—</b></div>
+        <div class="event-stat pole"><span>POLE</span><b id="event-pole">—</b></div>
+        <div class="event-stat title-watch"><span>CHAMPIONSHIP</span><b id="event-title-watch">—</b></div>
+        <div class="event-stat trophy"><span>TROPHY</span><b id="event-trophy">—</b></div>
       </div>
 
       <div class="grid-show" id="grid-show" aria-live="polite">
         <div class="grid-show-kicker" id="grid-kicker">SEASON 1 · ROUND 1</div>
-        <div class="grid-show-title">${escapeHtml(currentCircuit.name.toUpperCase())}</div>
-        <div class="grid-show-sub">12 FIELD VESSELS · PHYSICS AUTHORITATIVE</div>
+        <div class="grid-show-title">${escapeHtml(eventTitle)}</div>
+        <div class="grid-show-sub">${escapeHtml(packageKicker)}</div>
         <div class="grid-roster">${gridCards}</div>
+        <div class="weekend-note" id="weekend-note">QUALIFYING SETS THE GRID · FEATURE RACE PHYSICS SETS THE RESULT</div>
         <div class="grid-show-footer">THREVE · SIX'T · NOINE <span>BRBC</span></div>
       </div>
 
@@ -97,11 +137,12 @@ app.innerHTML = `
           <button id="season-toggle" class="secondary">SEASON</button>
         </div>
         <button id="circuit-cycle" class="secondary camera-button">TRACK · ${escapeHtml(currentCircuit.shortName.toUpperCase())}</button>
-        <label class="seed-label" for="seed">SIMULATION SEED</label>
+        <label class="seed-label" id="seed-label" for="seed">SIMULATION SEED</label>
         <div class="seed-row">
           <input id="seed" type="number" inputmode="numeric" />
           <button id="apply-seed" class="secondary compact">SET</button>
         </div>
+        <div class="qualifying-lock" id="qualifying-lock"></div>
         <div class="meta-grid">
           <span>STATE</span><strong id="state">READY</strong>
           <span>TIME</span><strong id="time">0.00</strong>
@@ -141,6 +182,15 @@ app.innerHTML = `
       <aside class="receipt" id="receipt" aria-live="polite"></aside>
       <aside class="season-panel" id="season-panel" aria-live="polite"></aside>
 
+      <div class="podium" id="podium" aria-live="polite">
+        <div class="podium-kicker">BRBC PODIUM CEREMONY</div>
+        <div class="podium-trophy">🏆</div>
+        <h2 id="podium-trophy-name">PARALLAX TROPHY</h2>
+        <div class="podium-sub" id="podium-sub">PHYSICS AUTHORITATIVE · RESULT RECEIPTED</div>
+        <div class="podium-grid" id="podium-grid"></div>
+        <button class="secondary podium-close" id="podium-close">RETURN TO RACE CONTROL</button>
+      </div>
+
       <div class="broadcast">
         <div class="brbc-mark">
           <b>BRBC</b>
@@ -169,6 +219,8 @@ const seasonToggleButton = document.querySelector<HTMLButtonElement>('#season-to
 const circuitCycleButton = document.querySelector<HTMLButtonElement>('#circuit-cycle')!;
 const applySeedButton = document.querySelector<HTMLButtonElement>('#apply-seed')!;
 const seedInput = document.querySelector<HTMLInputElement>('#seed')!;
+const seedLabelEl = document.querySelector<HTMLElement>('#seed-label')!;
+const qualifyingLockEl = document.querySelector<HTMLElement>('#qualifying-lock')!;
 const stateEl = document.querySelector<HTMLElement>('#state')!;
 const timeEl = document.querySelector<HTMLElement>('#time')!;
 const leaderEl = document.querySelector<HTMLElement>('#leader')!;
@@ -181,6 +233,7 @@ const standingsEl = document.querySelector<HTMLOListElement>('#standings')!;
 const receiptEl = document.querySelector<HTMLElement>('#receipt')!;
 const gridShowEl = document.querySelector<HTMLElement>('#grid-show')!;
 const gridKickerEl = document.querySelector<HTMLElement>('#grid-kicker')!;
+const weekendNoteEl = document.querySelector<HTMLElement>('#weekend-note')!;
 const roundChipEl = document.querySelector<HTMLElement>('#round-chip')!;
 const replayBugEl = document.querySelector<HTMLElement>('#replay-bug')!;
 const battleCardEl = document.querySelector<HTMLElement>('#battle-card')!;
@@ -196,6 +249,16 @@ const circuitRecordEl = document.querySelector<HTMLElement>('#circuit-record')!;
 const fastestSectorEl = document.querySelector<HTMLElement>('#fastest-sector')!;
 const speedTrapEl = document.querySelector<HTMLElement>('#speed-trap')!;
 const sportingDeltaEl = document.querySelector<HTMLElement>('#sporting-delta')!;
+const sessionTagEl = document.querySelector<HTMLElement>('#session-tag')!;
+const eventSessionEl = document.querySelector<HTMLElement>('#event-session')!;
+const eventPoleEl = document.querySelector<HTMLElement>('#event-pole')!;
+const eventTitleWatchEl = document.querySelector<HTMLElement>('#event-title-watch')!;
+const eventTrophyEl = document.querySelector<HTMLElement>('#event-trophy')!;
+const podiumEl = document.querySelector<HTMLElement>('#podium')!;
+const podiumGridEl = document.querySelector<HTMLElement>('#podium-grid')!;
+const podiumTrophyNameEl = document.querySelector<HTMLElement>('#podium-trophy-name')!;
+const podiumSubEl = document.querySelector<HTMLElement>('#podium-sub')!;
+const podiumCloseButton = document.querySelector<HTMLButtonElement>('#podium-close')!;
 
 seedInput.value = String(initialSeed);
 let broadcastHistory: BroadcastMessage[] = [];
@@ -215,27 +278,26 @@ renderSeasonPanel();
 renderRoundMeta();
 renderHealth();
 renderSporting();
+renderEventProduction();
 
 startButton.addEventListener('click', () => {
-  health.reset();
-  sporting.reset();
-  refreshHistoricalContext();
-  broadcastHistory = [];
-  renderBroadcastHistory();
-  renderHealth();
-  renderSporting();
+  if (weekendPhase === 'qualifying' && latestSnapshot?.state === 'finished' && weekend.getQualifyingResult()) {
+    navigateToCircuit(currentCircuit, raceSeed, 'race');
+    return;
+  }
+
+  resetObservers();
+  hidePodium();
+  injectEventOpening();
   engine.startRace();
 });
 
 resetButton.addEventListener('click', () => {
-  health.reset();
-  sporting.reset();
-  refreshHistoricalContext();
-  broadcastHistory = [];
-  renderBroadcastHistory();
-  renderHealth();
-  renderSporting();
+  if (weekendPhase === 'qualifying' && latestSnapshot?.state === 'finished') weekend.clearCurrentWeekend();
+  resetObservers();
+  hidePodium();
   engine.resetRace();
+  renderEventProduction();
 });
 
 cameraButton.addEventListener('click', () => {
@@ -243,7 +305,10 @@ cameraButton.addEventListener('click', () => {
   cameraButton.textContent = `CAMERA · ${mode.toUpperCase()}`;
 });
 
-replayButton.addEventListener('click', () => engine.playFinishReplay());
+replayButton.addEventListener('click', () => {
+  hidePodium();
+  engine.playFinishReplay();
+});
 nextRoundButton.addEventListener('click', prepareNextRound);
 seasonToggleButton.addEventListener('click', () => seasonPanelEl.classList.toggle('visible'));
 circuitCycleButton.addEventListener('click', cycleCircuit);
@@ -251,10 +316,9 @@ applySeedButton.addEventListener('click', applySeed);
 seedInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') applySeed();
 });
+podiumCloseButton.addEventListener('click', hidePodium);
 
-function applySeed() {
-  const value = Math.abs(Math.trunc(Number(seedInput.value))) || 369;
-  seedInput.value = String(value);
+function resetObservers() {
   health.reset();
   sporting.reset();
   refreshHistoricalContext();
@@ -262,6 +326,17 @@ function applySeed() {
   renderBroadcastHistory();
   renderHealth();
   renderSporting();
+}
+
+function applySeed() {
+  if (championshipEligibleAtLoad) {
+    window.alert('Championship event seeds are locked across qualifying and the feature race. Use a new event URL/seed before qualifying if you want a different weekend.');
+    return;
+  }
+
+  const value = Math.abs(Math.trunc(Number(seedInput.value))) || 369;
+  seedInput.value = String(value);
+  resetObservers();
   engine.setSeed(value);
   const nextUrl = new URL(window.location.href);
   nextUrl.searchParams.set('seed', String(value));
@@ -272,7 +347,7 @@ function cycleCircuit() {
   const playable = getPlayableCircuits();
   const index = playable.findIndex((circuit) => circuit.id === currentCircuit.id);
   const next = playable[(index + 1 + playable.length) % playable.length];
-  navigateToCircuit(next, Number(seedInput.value) || initialSeed);
+  navigateToCircuit(next, Number(seedInput.value) || raceSeed);
 }
 
 function prepareNextRound() {
@@ -285,13 +360,15 @@ function prepareNextRound() {
       : `Round ${round} is not registered yet.`);
     return;
   }
-  navigateToCircuit(nextCircuit, season.suggestSeed());
+  navigateToCircuit(nextCircuit, season.suggestSeed(), 'qualifying');
 }
 
-function navigateToCircuit(circuit: CircuitDefinition, seed: number) {
+function navigateToCircuit(circuit: CircuitDefinition, seed: number, phase?: WeekendPhase) {
   const nextUrl = new URL(window.location.href);
   nextUrl.searchParams.set('circuit', circuit.id);
   nextUrl.searchParams.set('seed', String(seed));
+  if (phase === 'qualifying' || phase === 'race') nextUrl.searchParams.set('phase', phase);
+  else nextUrl.searchParams.delete('phase');
   window.location.assign(nextUrl.toString());
 }
 
@@ -302,23 +379,46 @@ function renderSnapshot(snapshot: RaceSnapshot) {
   handleSportingEvents(sportingEvents, snapshot);
 
   if (snapshot.state === 'finished' && previousRaceState !== 'finished' && snapshot.receipt) {
-    const championshipRound = season.getNextRoundNumber();
-    if (currentCircuit.seasonRound === championshipRound) {
+    if (weekendPhase === 'qualifying' && championshipEligibleAtLoad) {
+      const qualifying = weekend.recordQualifying(
+        snapshot.standings,
+        snapshot.receipt,
+        health.getReport(),
+        sporting.getReport()
+      );
+      if (qualifying?.pole) {
+        injectAuxiliaryExchange([
+          ['THREVE', `POLE POSITION! ${qualifying.pole.name} will lead the feature grid!`],
+          ["SIX'T", qualifying.pole.time !== null
+            ? `Qualifying receipt confirms P1 at ${qualifying.pole.time.toFixed(3)} seconds. Grid order is now frozen for the feature race.`
+            : 'Pole came from terminal qualifying order after the timeout. The receipt preserves the exact basis.'],
+          ['NOINE', 'Front of the queue, then.']
+        ], 'finish');
+      }
+      renderEventProduction();
+      renderSeasonPanel();
+      renderRoundMeta();
+    } else if (weekendPhase === 'race' && championshipEligibleAtLoad) {
       season.recordRace(
         snapshot.receipt,
         snapshot.standings,
         currentCircuit,
         health.getReport(),
-        sporting.getReport()
+        sporting.getReport(),
+        weekend.getReceipt()
       );
+      weekend.markRaceComplete();
       refreshHistoricalContext();
       renderSeasonPanel();
       renderRoundMeta();
+      renderEventProduction();
+      renderPodium(snapshot);
     }
   }
   previousRaceState = snapshot.state;
 
-  stateEl.textContent = snapshot.replayActive ? 'REPLAY' : snapshot.state.toUpperCase();
+  const sessionPrefix = weekendPhase === 'qualifying' ? 'Q' : weekendPhase === 'race' ? 'RACE' : 'EX';
+  stateEl.textContent = snapshot.replayActive ? 'REPLAY' : `${sessionPrefix} · ${snapshot.state.toUpperCase()}`;
   timeEl.textContent = snapshot.elapsed.toFixed(2);
   leaderEl.textContent = snapshot.leader?.name ?? '—';
   sectorEl.textContent = snapshot.sector;
@@ -348,12 +448,27 @@ function renderSnapshot(snapshot: RaceSnapshot) {
     || snapshot.replayActive;
   const nextScheduled = getCircuitForRound(season.getNextRoundNumber());
   const rerunIsExhibition = snapshot.state === 'finished' && currentCircuit.seasonRound < season.getNextRoundNumber();
-  startButton.textContent = rerunIsExhibition ? 'RERUN EXHIBITION' : snapshot.state === 'finished' ? 'RACE AGAIN' : 'START BROADCAST';
+
+  if (weekendPhase === 'qualifying') {
+    startButton.textContent = snapshot.state === 'finished' && weekend.getQualifyingResult()
+      ? 'LOAD FEATURE RACE'
+      : 'START QUALIFYING';
+  } else if (rerunIsExhibition) {
+    startButton.textContent = 'RERUN EXHIBITION';
+  } else {
+    startButton.textContent = snapshot.state === 'finished' ? 'RACE AGAIN' : weekendPhase === 'race' ? 'START FEATURE RACE' : 'START BROADCAST';
+  }
+
   startButton.disabled = raceBusy;
   replayButton.disabled = !snapshot.replayAvailable || snapshot.replayActive || snapshot.state !== 'finished';
-  nextRoundButton.disabled = snapshot.state !== 'finished'
+  nextRoundButton.disabled = weekendPhase !== 'race'
+    || snapshot.state !== 'finished'
     || snapshot.replayActive
     || nextScheduled?.status !== 'playable';
+  circuitCycleButton.disabled = raceBusy;
+  const eventSeedLocked = championshipEligibleAtLoad;
+  seedInput.disabled = eventSeedLocked || raceBusy;
+  applySeedButton.disabled = eventSeedLocked || raceBusy;
 
   standingsEl.innerHTML = snapshot.standings.map((standing) => {
     const racerHealth = health.getRacer(standing.id);
@@ -396,7 +511,45 @@ function renderSnapshot(snapshot: RaceSnapshot) {
 
   renderHealth();
   renderSporting();
+  renderEventProduction();
   renderReceipt(snapshot.replayActive ? undefined : snapshot.receipt);
+}
+
+function renderEventProduction() {
+  const qualifying = weekend.getQualifyingResult();
+  const implications = season.getChampionshipImplications();
+  const session = weekendPhase === 'qualifying'
+    ? 'QUALIFYING'
+    : weekendPhase === 'race'
+      ? 'FEATURE RACE'
+      : weekendPhase === 'complete'
+        ? 'COMPLETE'
+        : 'EXHIBITION';
+
+  sessionTagEl.textContent = session;
+  eventSessionEl.textContent = session;
+  eventPoleEl.textContent = qualifying?.pole
+    ? `${qualifying.pole.code} · ${qualifying.pole.name}`
+    : weekendPhase === 'qualifying'
+      ? 'TO BE SET'
+      : 'OPEN GRID';
+  eventTitleWatchEl.textContent = implicationCompact(implications);
+  eventTrophyEl.textContent = currentCircuit.broadcast?.trophy ?? 'PARALLAX CUP';
+  seedLabelEl.textContent = weekendPhase === 'qualifying' ? 'QUALIFYING SEED' : weekendPhase === 'race' ? 'FEATURE RACE SEED' : 'SIMULATION SEED';
+
+  if (championshipEligibleAtLoad) {
+    qualifyingLockEl.textContent = weekendPhase === 'qualifying'
+      ? `EVENT SEED LOCKED · RACE SEED ${raceSeed} · Q SEED ${weekend.qualifyingSeed}`
+      : `EVENT SEED LOCKED · QUALIFYING + FEATURE RACE ARE SEPARATE RECEIPTED SESSIONS`;
+  } else {
+    qualifyingLockEl.textContent = 'EXHIBITION · SEED MAY BE CHANGED · NO CHAMPIONSHIP RECORDS WRITTEN';
+  }
+
+  weekendNoteEl.textContent = weekendPhase === 'qualifying'
+    ? 'QUALIFYING IS A PHYSICS SESSION · ORDER SETS THE FEATURE GRID · NO CHAMPIONSHIP POINTS AWARDED'
+    : weekendPhase === 'race'
+      ? `POLE ${qualifying?.pole?.code ?? '—'} · ${implications.narrative.toUpperCase()}`
+      : 'EXHIBITION SESSION · LIVE TELEMETRY ONLY · NO SEASON OR CAREER RECORD WRITES';
 }
 
 function renderHealth() {
@@ -423,7 +576,11 @@ function renderSporting() {
   const report = sporting.getReport();
   const record = historicalRecords.raceRecord;
   circuitRecordEl.textContent = record ? `${record.racerCode} · ${record.time.toFixed(3)}s` : 'UNSET';
-  sportingModeEl.textContent = historicalRecords.raceStarts ? `HIST ${historicalRecords.raceStarts}` : 'BASELINE';
+  sportingModeEl.textContent = weekendPhase === 'qualifying'
+    ? 'Q OBSERVED'
+    : historicalRecords.raceStarts
+      ? `HIST ${historicalRecords.raceStarts}`
+      : 'BASELINE';
 
   const latestSector = report.fastestSectors.at(-1);
   fastestSectorEl.textContent = latestSector
@@ -480,6 +637,7 @@ function renderReceipt(receipt?: RaceReceipt) {
   const winningTime = receipt.winningTime === null ? '—' : `${receipt.winningTime.toFixed(3)}s`;
   const report = health.getReport();
   const sportingReport = sporting.getReport();
+  const qualifying = weekend.getQualifyingResult();
   const recoveryLog = report.recoveryLog.length
     ? report.recoveryLog.map((entry) => `<span>${entry.elapsed.toFixed(2)}s · ${escapeHtml(entry.racerName)}</span>`).join('')
     : '<span>NO RECOVERY INTERVENTIONS</span>';
@@ -491,14 +649,19 @@ function renderReceipt(receipt?: RaceReceipt) {
   const trapRows = sportingReport.speedTrapRecords.map((hit) => `
     <span>${escapeHtml(hit.trapName)}</span><b>${escapeHtml(hit.racerCode)} · ${hit.speed.toFixed(2)}m/s</b>
   `).join('');
+  const receiptTitle = weekendPhase === 'qualifying'
+    ? 'PARALLAX QUALIFYING RECEIPT · GRID FORMATION LOG'
+    : 'PARALLAX RACE RECEIPT · BRBC PRODUCTION LOG';
 
   receiptEl.innerHTML = `
-    <div class="receipt-title">PARALLAX RACE RECEIPT · BRBC PRODUCTION LOG</div>
+    <div class="receipt-title">${receiptTitle}</div>
     <div class="receipt-winner">${escapeHtml(receipt.winner)}</div>
     <div class="receipt-grid">
+      <span>SESSION</span><b>${weekendPhase === 'qualifying' ? 'QUALIFYING' : weekendPhase === 'race' ? 'FEATURE RACE' : 'EXHIBITION'}</b>
       <span>CIRCUIT</span><b>${escapeHtml(currentCircuit.shortName)}</b>
       <span>WIN TIME</span><b>${winningTime}</b>
       <span>MARGIN</span><b>${margin}</b>
+      <span>GRID POLE</span><b>${escapeHtml(qualifying?.pole?.code ?? (weekendPhase === 'qualifying' ? 'PENDING' : 'OPEN'))}</b>
       <span>PHOTO FINISH</span><b>${receipt.photoFinish ? 'YES' : 'NO'}</b>
       <span>LEAD CHANGES</span><b>${receipt.leadChanges}</b>
       <span>OVERTAKES CALLED</span><b>${receipt.overtakes}</b>
@@ -521,7 +684,9 @@ function renderReceipt(receipt?: RaceReceipt) {
       <strong>RACE HEALTH LOG · OBSERVATIONAL</strong>
       <div class="receipt-health-log">${recoveryLog}</div>
     </div>
-    <div class="receipt-rule">SIMULATION AUTHORITATIVE · SPORTING INTELLIGENCE OBSERVATIONAL · DNF EARNS ZERO POINTS · REPLAY VISUAL ONLY</div>
+    <div class="receipt-rule">${weekendPhase === 'qualifying'
+      ? 'QUALIFYING PHYSICS AUTHORITATIVE · ORDER SETS GRID ONLY · ZERO CHAMPIONSHIP POINTS · TELEMETRY PRESERVED'
+      : 'SIMULATION AUTHORITATIVE · SPORTING INTELLIGENCE OBSERVATIONAL · QUALIFYING SET GRID ONLY · REPLAY VISUAL ONLY'}</div>
   `;
   receiptEl.classList.add('visible');
 }
@@ -532,6 +697,8 @@ function renderSeasonPanel() {
   const teams = season.getTeamStandings();
   const career = season.getCareerStats();
   const circuitRecords = season.getCircuitRecords(currentCircuit.id);
+  const implications = season.getChampionshipImplications();
+  const qualifying = weekend.getQualifyingResult();
   const leader = drivers[0];
   const latest = state.races.at(-1);
   const nextRound = season.getNextRoundNumber();
@@ -556,11 +723,16 @@ function renderSeasonPanel() {
     </div>
   `).join('');
   const historyRows = [...state.races].reverse().slice(0, 8).map((race) => `
-    <div class="history-row"><b>R${race.round}</b><span>${escapeHtml(race.receipt.winner)} · ${escapeHtml(race.circuitName)}${race.health ? ` · H${race.health.score}` : ''}${race.sporting ? ' · SI' : ''}</span><em>${race.seed}</em></div>
+    <div class="history-row"><b>R${race.round}</b><span>${escapeHtml(race.receipt.winner)} · ${escapeHtml(race.circuitName)}${race.weekend?.pole ? ` · Q ${escapeHtml(race.weekend.pole.code)}` : ''}${race.health ? ` · H${race.health.score}` : ''}${race.sporting ? ' · SI' : ''}</span><em>${race.seed}</em></div>
   `).join('');
   const recordLine = circuitRecords.raceRecord
     ? `<b>${escapeHtml(circuitRecords.raceRecord.racerCode)} · ${circuitRecords.raceRecord.time.toFixed(3)}s</b> by ${escapeHtml(circuitRecords.raceRecord.racerName)} · ${Object.keys(circuitRecords.sectorRecords).length} sector records · ${Object.keys(circuitRecords.speedTrapRecords).length} speed records`
     : 'NO CHAMPIONSHIP RECORD YET — FIRST ELIGIBLE FINISH SETS THE REFERENCE';
+  const weekendLine = qualifying?.pole
+    ? `<b>POLE ${escapeHtml(qualifying.pole.code)}</b> · Q seed ${qualifying.qualifyingSeed} · race seed ${qualifying.raceSeed} · full qualifying receipt preserved`
+    : championshipEligibleAtLoad
+      ? '<b>QUALIFYING PENDING</b> · a separate physics session will set the feature grid'
+      : '<b>EXHIBITION</b> · no qualifying or championship write';
 
   seasonPanelEl.innerHTML = `
     <div class="season-header">
@@ -572,6 +744,8 @@ function renderSeasonPanel() {
       <div class="season-stat"><span>LEADER</span><b>${escapeHtml(leader?.code ?? '—')}</b></div>
       <div class="season-stat"><span>LAST WIN</span><b>${escapeHtml(latest?.results[0]?.code ?? '—')}</b></div>
     </div>
+    <div class="season-section"><div class="season-section-title">EVENT WEEKEND · ${escapeHtml(eventTitle)}</div><div class="career-record-line">${weekendLine}</div></div>
+    <div class="season-section"><div class="season-section-title">CHAMPIONSHIP IMPLICATION</div><div class="career-record-line">${escapeHtml(implications.narrative)}</div></div>
     <div class="season-section"><div class="season-section-title">NEXT EVENT · ROUND ${nextRound}</div><div class="empty-season">${escapeHtml(nextCircuit?.name ?? 'UNREGISTERED')} · ${nextCircuit?.status === 'playable' ? 'PLAYABLE' : 'PLANNED'}</div></div>
     <div class="season-section"><div class="season-section-title">${escapeHtml(currentCircuit.shortName.toUpperCase())} · CIRCUIT RECORD</div><div class="career-record-line">${recordLine}</div></div>
     <div class="season-section"><div class="season-section-title">DRIVER CHAMPIONSHIP · DNF = 0 POINTS</div><div class="champ-list">${driverRows}</div></div>
@@ -582,7 +756,7 @@ function renderSeasonPanel() {
       <button class="secondary" id="export-season">EXPORT LEDGER</button>
       <button class="secondary" id="reset-season">NEW SEASON</button>
     </div>
-    <div class="season-rule">LOCAL-FIRST SEASON STATE · CAREER ARCHIVE SURVIVES NEW SEASONS · RESULTS COME FROM RACE RECEIPTS</div>
+    <div class="season-rule">LOCAL-FIRST EVENT + SEASON STATE · QUALIFYING RECEIPT PRESERVED WITH FEATURE RACE · RESULTS COME FROM PHYSICS</div>
   `;
 
   seasonPanelEl.querySelector<HTMLButtonElement>('#season-close')?.addEventListener('click', () => seasonPanelEl.classList.remove('visible'));
@@ -591,16 +765,20 @@ function renderSeasonPanel() {
     if (!window.confirm('Start a new Parallax Gran Prix season? Current season standings will clear, but career statistics and circuit records will remain. Export the ledger first if you want a snapshot.')) return;
     season.resetSeason();
     const opener = getCircuitForRound(1) ?? getPlayableCircuits()[0];
-    if (opener) navigateToCircuit(opener, season.suggestSeed());
+    if (opener) navigateToCircuit(opener, season.suggestSeed(), 'qualifying');
   });
 }
 
 function renderRoundMeta() {
   const state = season.getState();
-  const round = season.getNextRoundNumber();
-  const scheduled = currentCircuit.seasonRound === round;
+  const scheduled = championshipEligibleAtLoad;
+  const session = weekendPhase === 'qualifying'
+    ? 'QUALIFYING'
+    : weekendPhase === 'race'
+      ? 'FEATURE RACE'
+      : 'EXHIBITION';
   const label = scheduled
-    ? `SEASON ${state.seasonNumber} · ROUND ${round}`
+    ? `SEASON ${state.seasonNumber} · ROUND ${scheduledRoundAtLoad} · ${session}`
     : `SEASON ${state.seasonNumber} · EXHIBITION`;
   gridKickerEl.textContent = label;
   roundChipEl.textContent = `${label} · ${currentCircuit.shortName.toUpperCase()}`;
@@ -620,7 +798,8 @@ function exportSeasonLedger() {
 }
 
 function renderBroadcast(message: BroadcastMessage) {
-  const enriched = enrichBroadcastWithStats(message);
+  const sessionAdjusted = adaptBroadcastForSession(message);
+  const enriched = enrichBroadcastWithStats(sessionAdjusted);
   health.observeBroadcast(enriched);
   if (enriched.type === 'recovery') flashMarshal(enriched.text);
   broadcastHistory.push(enriched);
@@ -629,14 +808,32 @@ function renderBroadcast(message: BroadcastMessage) {
   renderHealth();
 }
 
+function adaptBroadcastForSession(message: BroadcastMessage): BroadcastMessage {
+  if (weekendPhase !== 'qualifying') return message;
+  let text = message.text;
+  if (message.type === 'start' && message.speaker === 'THREVE') {
+    text = text.replace('PARALLAX GRAN PRIX IS GO', 'QUALIFYING SPRINT IS GO');
+  }
+  if (message.type === 'winner' && message.speaker === 'THREVE') {
+    text = text.replace('WE HAVE A WINNER!', 'PROVISIONAL POLE!');
+  }
+  if (message.type === 'winner' && message.speaker === "SIX'T") {
+    text = 'Qualifying physics has rendered the provisional grid order. No championship points are attached to this session.';
+  }
+  return text === message.text ? message : { ...message, text };
+}
+
 function enrichBroadcastWithStats(message: BroadcastMessage): BroadcastMessage {
   if (message.speaker !== "SIX'T") return message;
   let text = message.text;
 
   if (message.type === 'opening') {
+    text += currentCircuit.broadcast?.hazardNote
+      ? ` Event package: ${currentCircuit.broadcast.hazardNote}`
+      : '';
     text += historicalRecords.raceRecord
       ? ` Circuit record: ${historicalRecords.raceRecord.racerName}, ${historicalRecords.raceRecord.time.toFixed(3)} seconds.`
-      : ' No prior championship time exists here; the first eligible finish establishes the circuit record.';
+      : ' No prior championship time exists here; the first eligible feature-race finish establishes the circuit record.';
   }
 
   if (message.type === 'sector' && latestSnapshot) {
@@ -645,7 +842,7 @@ function enrichBroadcastWithStats(message: BroadcastMessage): BroadcastMessage {
     if (record) text += ` Historical ${sector?.name.toLowerCase()} mark: ${record.duration.toFixed(3)} seconds by ${record.racerName}.`;
   }
 
-  if (message.type === 'winner') {
+  if (message.type === 'winner' && weekendPhase !== 'qualifying') {
     const racer = RACERS.find((candidate) => message.text.toLowerCase().includes(candidate.name.toLowerCase()));
     const career = racer ? careerAtGreen.find((row) => row.id === racer.id) : undefined;
     if (career?.starts) text += ` Entering today: ${career.wins} career wins from ${career.starts} starts.`;
@@ -654,9 +851,43 @@ function enrichBroadcastWithStats(message: BroadcastMessage): BroadcastMessage {
   return text === message.text ? message : { ...message, text };
 }
 
+function injectEventOpening() {
+  const packageInfo = currentCircuit.broadcast;
+  const implications = season.getChampionshipImplications();
+  const qualifying = weekend.getQualifyingResult();
+
+  if (weekendPhase === 'qualifying') {
+    injectAuxiliaryExchange([
+      ['THREVE', `QUALIFYING IS OPEN AT ${eventTitle}! Twelve vessels, one shot at pole!`],
+      ["SIX'T", `Qualifying seed ${weekend.qualifyingSeed}. This is a separate physics session; its order sets the feature grid and awards zero championship points.`],
+      ['NOINE', packageInfo?.noineTag ?? 'Proceed.']
+    ], 'opening');
+    return;
+  }
+
+  if (weekendPhase === 'race') {
+    const poleLine = qualifying?.pole
+      ? `${qualifying.pole.name} starts from pole${qualifying.pole.time !== null ? ` after a ${qualifying.pole.time.toFixed(3)} second qualifying run` : ''}.`
+      : 'No qualifying pole is recorded.';
+    injectAuxiliaryExchange([
+      ['THREVE', `FEATURE RACE TIME — ${eventTitle}! ${poleLine}`],
+      ["SIX'T", `${implications.narrative} Qualifying has no further authority now; race physics decides the result.`],
+      ['NOINE', packageInfo?.noineTag ?? 'Quite.']
+    ], 'opening');
+    return;
+  }
+
+  injectAuxiliaryExchange([
+    ['THREVE', `EXHIBITION RUN — ${eventTitle}!`],
+    ["SIX'T", 'Live telemetry is active. This session does not write championship, career, or circuit records.'],
+    ['NOINE', packageInfo?.noineTag ?? 'Carry on.']
+  ], 'opening');
+}
+
 function handleSportingEvents(events: SportingEvent[], snapshot: RaceSnapshot) {
   if (snapshot.state !== 'running' && snapshot.state !== 'finished') return;
-  const championshipEligible = currentCircuit.seasonRound === season.getNextRoundNumber();
+  const championshipEligible = weekendPhase === 'race'
+    && currentCircuit.seasonRound === season.getNextRoundNumber();
   if (!championshipEligible) return;
 
   events.forEach((event) => {
@@ -665,32 +896,35 @@ function handleSportingEvents(events: SportingEvent[], snapshot: RaceSnapshot) {
     if (event.type === 'sector-split') {
       const historic = historicalRecords.sectorRecords[event.split.sectorId];
       if (!historic || event.split.duration >= historic.duration - 0.002) return;
-      injectSportingExchange([
+      injectAuxiliaryExchange([
         ['THREVE', `NEW SECTOR RECORD! ${event.split.racerName} — ${event.split.sectorName} in ${event.split.duration.toFixed(3)}!`],
         ["SIX'T", `${(historic.duration - event.split.duration).toFixed(3)} seconds inside the historical mark held by ${historic.racerName}. Sporting Intelligence confirms the observation.`],
-        ['NOINE', currentCircuit.id === 'mirror-labyrinth' ? 'Improved reflection.' : 'Efficient.']
-      ]);
+        ['NOINE', currentCircuit.id === 'mirror-labyrinth' ? 'Improved reflection.' : currentCircuit.id === 'ledger-larry-500' ? 'Filed.' : 'Efficient.']
+      ], 'sector');
       return;
     }
 
     const historic = historicalRecords.speedTrapRecords[event.hit.trapId];
     if (!historic || event.hit.speed <= historic.speed + 0.02) return;
-    injectSportingExchange([
+    injectAuxiliaryExchange([
       ['THREVE', `SPEED RECORD! ${event.hit.racerName} flashes through ${event.hit.trapName} at ${event.hit.speed.toFixed(2)} metres per second!`],
       ["SIX'T", `${(event.hit.speed - historic.speed).toFixed(2)} metres per second above the previous championship trap record by ${historic.racerName}.`],
-      ['NOINE', 'Rather brisk.']
-    ]);
+      ['NOINE', currentCircuit.id === 'ledger-larry-500' ? 'Expedited.' : 'Rather brisk.']
+    ], 'sector');
   });
 }
 
-function injectSportingExchange(lines: Array<[BroadcastMessage['speaker'], string]>) {
+function injectAuxiliaryExchange(
+  lines: Array<[BroadcastMessage['speaker'], string]>,
+  type: BroadcastMessage['type'] = 'opening'
+) {
   const sequenceId = ++auxiliarySequence;
   const now = performance.now();
   lines.forEach(([speaker, text], lineIndex) => {
     broadcastHistory.push({
       speaker,
       text,
-      type: 'sector',
+      type,
       time: now,
       sequenceId,
       lineIndex,
@@ -699,6 +933,39 @@ function injectSportingExchange(lines: Array<[BroadcastMessage['speaker'], strin
   });
   broadcastHistory = broadcastHistory.slice(-3);
   renderBroadcastHistory();
+}
+
+function renderPodium(snapshot: RaceSnapshot) {
+  if (weekendPhase !== 'race') return;
+  const podium = snapshot.standings.filter((standing) => standing.finished).slice(0, 3);
+  if (!podium.length) return;
+
+  const first = podium[0];
+  const second = podium[1];
+  const third = podium[2];
+  const card = (standing: typeof first | undefined, place: number, className: string) => standing
+    ? `<div class="podium-place ${className}" style="--racer-accent:${standing.accent}">
+        <span>P${place}</span>
+        <b>${escapeHtml(standing.code)}</b>
+        <strong>${escapeHtml(standing.name)}</strong>
+        <small>${standing.finishTime !== undefined ? `${standing.finishTime.toFixed(3)}s` : 'DNF'}</small>
+      </div>`
+    : `<div class="podium-place ${className}"><span>P${place}</span><b>—</b><strong>NO FINISHER</strong></div>`;
+
+  podiumTrophyNameEl.textContent = currentCircuit.broadcast?.trophy ?? 'PARALLAX GRAN PRIX TROPHY';
+  podiumSubEl.textContent = `${eventTitle} · WINNER ${first.code} · RESULT RECEIPTED`;
+  podiumGridEl.innerHTML = `${card(second, 2, 'second')}${card(first, 1, 'first')}${card(third, 3, 'third')}`;
+  podiumEl.classList.add('visible');
+
+  injectAuxiliaryExchange([
+    ['THREVE', `${first.name} WINS ${eventTitle}! TO THE PODIUM!`],
+    ["SIX'T", `Official top three: ${podium.map((standing) => `${standing.code} P${standing.place}`).join(', ')}. The feature-race receipt is authoritative.`],
+    ['NOINE', currentCircuit.id === 'ledger-larry-500' ? 'Award the carbon copy.' : 'Quite.']
+  ], 'winner');
+}
+
+function hidePodium() {
+  podiumEl.classList.remove('visible');
 }
 
 function flashMarshal(line: string) {
@@ -735,6 +1002,14 @@ function renderBroadcastHistory() {
 function refreshHistoricalContext() {
   historicalRecords = season.getCircuitRecords(currentCircuit.id);
   careerAtGreen = season.getCareerStats();
+}
+
+function implicationCompact(implications: ReturnType<SeasonManager['getChampionshipImplications']>) {
+  if (implications.baseline) return 'BASELINE';
+  if (!implications.leader || !implications.challenger) return '—';
+  return implications.leadInPlay
+    ? `${implications.challenger.code} -${implications.gap} TO ${implications.leader.code} · LEAD IN PLAY`
+    : `${implications.leader.code} +${implications.gap} · CONTROL`;
 }
 
 function healthCode(state: string) {

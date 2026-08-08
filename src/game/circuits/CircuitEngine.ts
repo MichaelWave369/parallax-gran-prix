@@ -5,6 +5,7 @@ import { buildBattlecaseCircuit } from './BattlecaseCircuit';
 import { buildBackspin96Circuit } from './Backspin96Circuit';
 import { buildSpaungearCircuit } from './SpaungearCircuit';
 import { buildMirrorLabyrinthCircuit } from './MirrorLabyrinthCircuit';
+import { buildLedgerLarryCircuit } from './LedgerLarryCircuit';
 
 export type CircuitModule = CircuitDefinition & {
   build(runtime: CircuitRuntime): void;
@@ -33,6 +34,11 @@ const BUILDERS: Record<string, BuilderConfig> = {
   'mirror-labyrinth': {
     build: buildMirrorLabyrinthCircuit,
     splitWindow: { startZ: 12.6, endZ: 18.4 },
+    splitCameraZ: 21
+  },
+  'ledger-larry-500': {
+    build: buildLedgerLarryCircuit,
+    splitWindow: { startZ: 12.8, endZ: 18.6 },
     splitCameraZ: 21
   }
 };
