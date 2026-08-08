@@ -1,9 +1,14 @@
 import { RACERS } from './config';
+import type { RunHealthReport } from './RaceHealthMonitor';
 import type { RaceReceipt, Standing } from './RaceEngine';
 import type { CircuitDefinition } from './TrackRegistry';
 
 const STORAGE_KEY = 'parallax-gran-prix.season.v1';
 const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1, 0, 0] as const;
+
+export type SeasonRaceResult = Pick<Standing, 'place' | 'id' | 'code' | 'name' | 'team' | 'finishTime'> & {
+  finished?: boolean;
+};
 
 export type SeasonRaceRecord = {
   id: string;
@@ -13,7 +18,8 @@ export type SeasonRaceRecord = {
   seed: number;
   completedAt: string;
   receipt: RaceReceipt;
-  results: Array<Pick<Standing, 'place' | 'id' | 'code' | 'name' | 'team' | 'finishTime'>>;
+  health?: RunHealthReport;
+  results: SeasonRaceResult[];
 };
 
 export type DriverStanding = {
@@ -24,12 +30,14 @@ export type DriverStanding = {
   points: number;
   wins: number;
   podiums: number;
+  dnfs: number;
 };
 
 export type TeamStanding = {
   team: string;
   points: number;
   wins: number;
+  dnfs: number;
 };
 
 export type SeasonState = {
@@ -59,7 +67,12 @@ export class SeasonManager {
     return 369_000 + this.state.seasonNumber * 1_000 + round * 37;
   }
 
-  recordRace(receipt: RaceReceipt, standings: Standing[], circuit: CircuitDefinition) {
+  recordRace(
+    receipt: RaceReceipt,
+    standings: Standing[],
+    circuit: CircuitDefinition,
+    health?: RunHealthReport
+  ) {
     const round = this.getNextRoundNumber();
     const record: SeasonRaceRecord = {
       id: `S${this.state.seasonNumber}-R${round}-${receipt.seed}`,
@@ -69,13 +82,15 @@ export class SeasonManager {
       seed: receipt.seed,
       completedAt: new Date().toISOString(),
       receipt: structuredClone(receipt),
+      health: health ? structuredClone(health) : undefined,
       results: standings.map((standing) => ({
         place: standing.place,
         id: standing.id,
         code: standing.code,
         name: standing.name,
         team: standing.team,
-        finishTime: standing.finishTime
+        finishTime: standing.finishTime,
+        finished: standing.finished
       }))
     };
     this.state.races.push(record);
@@ -91,7 +106,8 @@ export class SeasonManager {
       team: racer.team,
       points: 0,
       wins: 0,
-      podiums: 0
+      podiums: 0,
+      dnfs: 0
     }));
     const byId = new Map(rows.map((row) => [row.id, row]));
 
@@ -99,6 +115,11 @@ export class SeasonManager {
       race.results.forEach((result) => {
         const row = byId.get(result.id);
         if (!row) return;
+        const finished = result.finished ?? result.finishTime !== undefined;
+        if (!finished) {
+          row.dnfs += 1;
+          return;
+        }
         row.points += POINTS[result.place - 1] ?? 0;
         if (result.place === 1) row.wins += 1;
         if (result.place <= 3) row.podiums += 1;
@@ -106,19 +127,26 @@ export class SeasonManager {
     });
 
     return rows.sort((a, b) =>
-      b.points - a.points || b.wins - a.wins || b.podiums - a.podiums || a.name.localeCompare(b.name)
+      b.points - a.points
+      || b.wins - a.wins
+      || b.podiums - a.podiums
+      || a.dnfs - b.dnfs
+      || a.name.localeCompare(b.name)
     );
   }
 
   getTeamStandings(): TeamStanding[] {
     const teams = new Map<string, TeamStanding>();
     this.getDriverStandings().forEach((driver) => {
-      const row = teams.get(driver.team) ?? { team: driver.team, points: 0, wins: 0 };
+      const row = teams.get(driver.team) ?? { team: driver.team, points: 0, wins: 0, dnfs: 0 };
       row.points += driver.points;
       row.wins += driver.wins;
+      row.dnfs += driver.dnfs;
       teams.set(driver.team, row);
     });
-    return [...teams.values()].sort((a, b) => b.points - a.points || b.wins - a.wins || a.team.localeCompare(b.team));
+    return [...teams.values()].sort((a, b) =>
+      b.points - a.points || b.wins - a.wins || a.dnfs - b.dnfs || a.team.localeCompare(b.team)
+    );
   }
 
   resetSeason() {
@@ -136,6 +164,7 @@ export class SeasonManager {
       schema: 'parallax-gran-prix-season-ledger/v1',
       exportedAt: new Date().toISOString(),
       pointsSystem: [...POINTS],
+      dnfRule: 'DNF results receive zero championship points.',
       season: this.state,
       drivers: this.getDriverStandings(),
       teams: this.getTeamStandings()

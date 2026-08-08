@@ -1,0 +1,132 @@
+.health-strip {
+  margin-top: 12px;
+  border-top: 1px solid rgba(98, 202, 255, 0.18);
+  padding-top: 10px;
+  display: grid;
+  gap: 7px;
+}
+
+.health-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #78dcff;
+}
+
+.health-head b {
+  color: #f3c86d;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.marshal-status {
+  border: 1px solid rgba(243, 200, 109, 0.35);
+  background: rgba(243, 200, 109, 0.06);
+  color: #e7c878;
+  padding: 6px 8px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.marshal-status.active {
+  animation: marshal-pulse 0.8s ease-out 2;
+  border-color: rgba(255, 135, 60, 0.9);
+  color: #ffc074;
+  background: rgba(255, 111, 38, 0.12);
+}
+
+.health-problems {
+  display: grid;
+  gap: 4px;
+}
+
+.health-problem {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.025);
+  border-left: 2px solid rgba(120, 220, 255, 0.45);
+  font-size: 9px;
+}
+
+.health-problem[data-state='WATCH'] { border-left-color: #e7c878; }
+.health-problem[data-state='STALLED'] { border-left-color: #ff7548; }
+.health-problem[data-state='RECOVERED'] { border-left-color: #91d46b; }
+.health-problem[data-state='DNF'] { border-left-color: #ff4563; }
+
+.health-problem b {
+  color: #f5f1e8;
+}
+
+.health-problem span {
+  color: #a9bec9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.health-problem em {
+  color: #d6ad60;
+  font-style: normal;
+}
+
+.health-empty {
+  color: #78909b;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.standing small .health-inline {
+  margin-left: 4px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.health-inline[data-state='GREEN'],
+.health-inline[data-state='FINISHED'] { color: #8fd38b; }
+.health-inline[data-state='WATCH'] { color: #e7c878; }
+.health-inline[data-state='STALLED'] { color: #ff7548; }
+.health-inline[data-state='RECOVERED'] { color: #a8e66f; }
+.health-inline[data-state='DNF'] { color: #ff4563; }
+
+.receipt-health {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(120, 220, 255, 0.18);
+  display: grid;
+  gap: 5px;
+  font-size: 9px;
+  color: #9eb3bd;
+}
+
+.receipt-health strong {
+  color: #f0c76d;
+  letter-spacing: 0.06em;
+}
+
+.receipt-health-log {
+  max-height: 54px;
+  overflow: auto;
+  display: grid;
+  gap: 3px;
+}
+
+.receipt-health-log span {
+  display: block;
+  color: #8da2ac;
+}
+
+@keyframes marshal-pulse {
+  0% { box-shadow: 0 0 0 rgba(255, 123, 50, 0); }
+  45% { box-shadow: 0 0 18px rgba(255, 123, 50, 0.42); }
+  100% { box-shadow: 0 0 0 rgba(255, 123, 50, 0); }
+}

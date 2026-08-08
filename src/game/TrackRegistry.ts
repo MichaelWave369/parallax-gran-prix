@@ -34,6 +34,14 @@ export const BACKSPIN_SECTORS: readonly CircuitSector[] = [
   { id: 'speaker', name: 'SPEAKER STACK SPRINT', startZ: 31, endZ: 50 }
 ] as const;
 
+export const SPAUNGEAR_SECTORS: readonly CircuitSector[] = [
+  { id: 'forge', name: 'FORGE ENTRY', startZ: -50, endZ: -31 },
+  { id: 'pinion', name: 'PINION FIELD', startZ: -31, endZ: -11 },
+  { id: 'transfer', name: 'TRANSFER GATES', startZ: -11, endZ: 10 },
+  { id: 'split', name: 'CROWN MESH', startZ: 10, endZ: 31 },
+  { id: 'output', name: 'OUTPUT SHAFT', startZ: 31, endZ: 50 }
+] as const;
+
 export const CIRCUITS: CircuitDefinition[] = [
   {
     id: 'battlecase',
@@ -55,7 +63,16 @@ export const CIRCUITS: CircuitDefinition[] = [
     sectors: BACKSPIN_SECTORS,
     features: ['turntables', 'tonearms', 'crossfader', 'speaker-kickers', 'finish-replay', 'recovery-marshal']
   },
-  { id: 'spaungear', name: 'SPAUNGEAR Works', shortName: 'SPAUNGEAR', status: 'planned', seasonRound: 3, description: 'Mechanical transfer points across rotating gear fields.', sectors: [], features: ['gears', 'transfer-gates'] },
+  {
+    id: 'spaungear',
+    name: 'SPAUNGEAR Works',
+    shortName: 'SPAUNGEAR',
+    status: 'playable',
+    seasonRound: 3,
+    description: 'A mechanical transfer works of pinion fields, rotating timing bars, crown-mesh splits, and output-shaft hazards.',
+    sectors: SPAUNGEAR_SECTORS,
+    features: ['gear-fields', 'transfer-gates', 'crown-mesh', 'timing-windows', 'finish-replay', 'recovery-marshal']
+  },
   { id: 'mirror-labyrinth', name: 'Mirror Labyrinth', shortName: 'Mirror', status: 'planned', seasonRound: 4, description: 'Symmetry, inverse routes, reflective tunnels, and misleading geometry.', sectors: [], features: ['mirrors', 'inverse-routes'] },
   { id: 'ledger-larry-500', name: 'Ledger Larry 500', shortName: 'Larry 500', status: 'planned', seasonRound: 5, description: 'Administrative machinery, paper rollers, stamps, and catastrophic accounting.', sectors: [], features: ['paperwork', 'audit-gates'] },
   { id: 'phivessel-dream-run', name: 'PhiVessel Dream Run', shortName: 'Dream Run', status: 'planned', seasonRound: 6, description: 'Glowing geometry and shifting dream-state route logic.', sectors: [], features: ['dream-gates', 'dynamic-geometry'] },
