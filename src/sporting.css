@@ -72,6 +72,11 @@
 .sport-inline .minus { color: #8ed8a1; }
 .sport-inline .plus { color: #ddb16b; }
 
+.receipt.visible {
+  max-height: calc(100vh - 54px);
+  overflow: auto;
+}
+
 .receipt-sporting {
   margin-top: 9px;
   padding-top: 8px;
