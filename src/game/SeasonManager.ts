@@ -110,6 +110,7 @@ export class SeasonManager {
   constructor() {
     this.state = this.load();
     this.career = this.loadCareer(this.state.races);
+    this.saveCareer();
   }
 
   getState() {
