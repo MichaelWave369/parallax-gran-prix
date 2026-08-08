@@ -18,7 +18,7 @@ The GitHub Pages workflow builds the Vite application from `main` and deploys th
 
 ## Project status
 
-**Pre-alpha / Slice 3 — Broadcast Director.** Battlecase Circuit now runs as a small live sports production: 12 cannon-es Field Vessels race through physical obstacles while a telemetry-driven BRBC director detects battles and overtakes, chooses camera shots, queues three-announcer exchanges, and records finish replay poses.
+**Pre-alpha / Slice 4 — Season + Race Operations.** Battlecase Circuit now runs inside a persistent local championship. Completed physics races become saved event receipts, championship points are derived from finishing order, season history survives reloads, and the season ledger can be exported as JSON.
 
 ## Current Battlecase Circuit
 
@@ -27,6 +27,18 @@ The GitHub Pages workflow builds the Vite application from `main` and deploys th
 3. **Cooling Gauntlet** — moving physical sweepers and fan-hub bumpers.
 4. **Parallax Split** — racers physically choose left or right around a central divider.
 5. **Motherboard Sprint** — final slalom into the finish gate.
+
+## Season 1 circuit registry
+
+1. Battlecase Circuit — active
+2. Backspin '96 — planned
+3. SPAUNGEAR Works — planned
+4. Mirror Labyrinth — planned
+5. Ledger Larry 500 — planned
+6. PhiVessel Dream Run — planned
+7. Carbon Loop — planned
+8. Parallax Data Center — planned
+9. The 3–6–9 Grand Final — planned
 
 ## Current features
 
@@ -37,15 +49,20 @@ The GitHub Pages workflow builds the Vite application from `main` and deploys th
 - moving cannon-es track obstacles
 - sector transitions and Parallax Split route receipts
 - telemetry-driven BRBC Broadcast Director
-- closest-battle detection
-- overtake detection
-- automatic `grid-wide`, `leader-chase`, `battle-two-shot`, `split-overhead`, and `finish-line` camera direction
-- manual spectator camera override modes
+- closest-battle and overtake detection
+- automatic TV-style camera direction plus manual spectator overrides
 - queued Threve → Six't → Noine commentary exchanges
 - final-charge British-gibberish mode
 - photo-finish detection
 - visual-only slow-motion finish replay from recorded poses
 - production-aware race receipt
+- persistent local Season 1 championship
+- `25–18–15–12–10–8–6–4–2–1` points table
+- driver and team standings
+- saved race receipt history
+- `NEXT ROUND` reproducible seed preparation
+- JSON season-ledger export
+- versioned circuit registry contract
 - GitHub Actions CI
 - automatic GitHub Pages deployment
 
@@ -58,6 +75,7 @@ The GitHub Pages workflow builds the Vite application from `main` and deploys th
 5. **Mod-friendly architecture.** Community circuits and racers should become possible without rewriting the engine.
 6. **Broadcast never overrides sport.** BRBC may choose the camera, commentary, or replay — never the winner.
 7. **Replay is historical presentation.** Recorded poses are visual evidence, not a second simulation.
+8. **Receipts create standings.** Championship state is derived from recorded race results, never the reverse.
 
 ## Local development
 
@@ -84,8 +102,10 @@ The project uses a Vite base path of `/parallax-gran-prix/` for GitHub Pages.
 src/game/RaceEngine.ts          authoritative race runtime + presentation bridge
 src/game/BroadcastDirector.ts   telemetry-driven shot/event selection
 src/game/ReplayBuffer.ts        recorded visual pose replay
-src/main.ts                     live BRBC broadcast UI
-docs/                           design, architecture, circuits, broadcast rules
+src/game/SeasonManager.ts       persistent race history + championship derivation
+src/game/TrackRegistry.ts       Season 1 circuit identity/metadata contract
+src/main.ts                     live BRBC broadcast + race operations UI
+docs/                           design, architecture, circuits, broadcast, race operations
 .github/workflows/              CI and GitHub Pages deployment
 ```
 

@@ -1,0 +1,110 @@
+.ops-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ops-controls button { font-size: 8px; padding: 8px 7px; }
+
+.season-panel {
+  position: absolute;
+  z-index: 12;
+  top: 18px;
+  right: 18px;
+  width: min(390px, calc(100vw - 36px));
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  padding: 15px;
+  border: 1px solid rgba(224, 177, 95, .68);
+  background: linear-gradient(180deg, rgba(5, 15, 28, .98), rgba(4, 7, 13, .97));
+  box-shadow: 0 24px 90px rgba(0, 0, 0, .72), inset 0 0 45px rgba(63, 194, 255, .045);
+  transform: translateX(calc(100% + 30px));
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .24s ease, opacity .24s ease;
+  backdrop-filter: blur(16px);
+}
+
+.season-panel.visible {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.season-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.season-header small { display: block; color: #67dcff; font-size: 8px; font-weight: 900; letter-spacing: .18em; }
+.season-header h2 { margin: 4px 0 0; color: #e6bd6d; font-size: 22px; line-height: 1; }
+.season-close { min-width: 34px; padding: 6px 8px; }
+
+.season-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin: 13px 0;
+}
+
+.season-stat { padding: 9px; border: 1px solid rgba(94, 208, 255, .14); background: rgba(255, 255, 255, .025); }
+.season-stat span { display: block; color: #718b99; font-size: 7px; font-weight: 900; letter-spacing: .12em; }
+.season-stat b { display: block; margin-top: 4px; color: #f4ecd7; font-size: 15px; }
+
+.season-section { margin-top: 13px; }
+.season-section-title { margin-bottom: 6px; color: #75dcff; font-size: 8px; font-weight: 900; letter-spacing: .18em; }
+.champ-list, .race-history { display: grid; gap: 4px; }
+.champ-row {
+  display: grid;
+  grid-template-columns: 24px 34px 1fr auto;
+  gap: 7px;
+  align-items: center;
+  padding: 6px 7px;
+  border-left: 2px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03);
+}
+.champ-row:first-child { border-left-color: #dca94e; background: linear-gradient(90deg, rgba(220,169,78,.12), rgba(255,255,255,.025)); }
+.champ-row > b { color: #72dcff; text-align: center; }
+.champ-row > i { color: #e7c471; font-size: 10px; font-style: normal; font-weight: 950; }
+.champ-row span { min-width: 0; }
+.champ-row strong, .champ-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.champ-row strong { color: #eee8d9; font-size: 10px; }
+.champ-row small { margin-top: 1px; color: #748894; font-size: 7px; }
+.champ-row em { color: #e5bd6b; font-size: 10px; font-style: normal; font-weight: 900; }
+
+.team-row { grid-template-columns: 24px 1fr auto; }
+
+.race-history { max-height: 150px; overflow: auto; }
+.history-row {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  gap: 7px;
+  padding: 6px 7px;
+  background: rgba(255,255,255,.025);
+  font-size: 8px;
+}
+.history-row b { color: #70d9ff; }
+.history-row span { color: #d9d4c6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-row em { color: #a98c55; font-style: normal; }
+.empty-season { padding: 12px; border: 1px dashed rgba(93,205,255,.18); color: #69808d; font-size: 8px; text-align: center; letter-spacing: .1em; }
+
+.season-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.season-actions button { font-size: 8px; }
+.season-rule { margin-top: 10px; color: #6e6656; font-size: 7px; font-weight: 900; letter-spacing: .12em; text-align: center; }
+
+.round-chip {
+  position: absolute;
+  z-index: 6;
+  top: 18px;
+  left: 18px;
+  padding: 7px 10px;
+  border: 1px solid rgba(226, 176, 80, .35);
+  background: rgba(4, 10, 18, .78);
+  color: #e2b050;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: .12em;
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .round-chip { top: 8px; left: 8px; }
+  .season-panel { top: 8px; right: 8px; width: min(360px, calc(100vw - 16px)); max-height: calc(100vh - 16px); }
+}
