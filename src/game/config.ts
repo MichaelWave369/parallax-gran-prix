@@ -37,9 +37,13 @@ export const RACE = {
   photoFinishThreshold: 0.22,
   replayWindowSeconds: 5.2,
   replayPlaybackRate: 0.42,
-  raceTimeoutSeconds: 55
+  raceTimeoutSeconds: 55,
+  recoveryStallSeconds: 4.5,
+  recoveryMinProgress: 0.8,
+  recoverySpeedThreshold: 1.25
 } as const;
 
+// Legacy Battlecase sector export retained while circuit-specific sectors migrate to TrackRegistry.
 export const SECTORS = [
   { id: 'boot', name: 'BOOT STRAIGHT', startZ: -50, endZ: -31 },
   { id: 'gpu', name: 'GPU CANYON', startZ: -31, endZ: -13 },
@@ -57,6 +61,7 @@ export type BroadcastEventType =
   | 'overtake'
   | 'battle'
   | 'collision'
+  | 'recovery'
   | 'sector'
   | 'split'
   | 'final-ten'
@@ -73,15 +78,15 @@ export type BroadcastBeat = {
 export const BRBC_EXCHANGES: Record<BroadcastEventType, BroadcastBeat[][]> = {
   opening: [
     [
-      { speaker: 'THREVE', text: 'Good evening, field-watchers! Twelve vessels are locked into Battlecase Circuit!' },
-      { speaker: "SIX'T", text: 'Seed committed. Physics authoritative. Cooling sweepers are already rotating.' },
+      { speaker: 'THREVE', text: 'Good evening, field-watchers! Twelve vessels are locked into the circuit!' },
+      { speaker: "SIX'T", text: 'Seed committed. Physics authoritative. Track mechanisms are live.' },
       { speaker: 'NOINE', text: 'Splendid. Release the marbles.' }
     ]
   ],
   start: [
     [
       { speaker: 'THREVE', text: "AND WE'RE ROLLING! PARALLAX GRAN PRIX IS GO!" },
-      { speaker: "SIX'T", text: 'Initial velocity field is compressing toward GPU Canyon.' },
+      { speaker: "SIX'T", text: 'Initial velocity field is compressing into the opening sector.' },
       { speaker: 'NOINE', text: 'Try the brakes. Oh. Right.' }
     ]
   ],
@@ -116,6 +121,13 @@ export const BRBC_EXCHANGES: Record<BroadcastEventType, BroadcastBeat[][]> = {
       { speaker: 'THREVE', text: 'ABSOLUTE SCENES — {detail} HAS FOUND THE FURNITURE!' },
       { speaker: "SIX'T", text: 'That was an entirely measurable catastrophe.' },
       { speaker: 'NOINE', text: 'Bit untidy.' }
+    ]
+  ],
+  recovery: [
+    [
+      { speaker: 'THREVE', text: 'RECOVERY MARSHAL IS IN — {detail}!' },
+      { speaker: "SIX'T", text: 'Deadlock threshold confirmed. Deterministic impulse only; no teleport and the intervention is receipted.' },
+      { speaker: 'NOINE', text: 'Give it a shove, then.' }
     ]
   ],
   sector: [
