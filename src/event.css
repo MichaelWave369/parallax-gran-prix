@@ -11,6 +11,10 @@
   pointer-events: none;
 }
 
+/* Event production owns the central upper-third; live sector/battle graphics sit below it. */
+.sector-banner { top: 160px; }
+.battle-card { top: 198px; }
+
 .event-stat {
   min-width: 0;
   padding: 7px 9px;
@@ -191,10 +195,12 @@
     width: min(620px, 58vw);
     grid-template-columns: repeat(2, 1fr);
   }
+  .sector-banner { top: 166px; }
 }
 
 @media (max-width: 760px) {
   .event-strip { display: none; }
+  .sector-banner { top: 102px; }
   .podium-grid { gap: 4px; }
   .podium-place { padding: 8px; }
   .podium-place > b { font-size: 15px; }
