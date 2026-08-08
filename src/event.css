@@ -1,0 +1,201 @@
+.event-strip {
+  position: absolute;
+  z-index: 6;
+  top: 106px;
+  left: 50%;
+  width: min(680px, 48vw);
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  pointer-events: none;
+}
+
+.event-stat {
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(114, 218, 255, 0.16);
+  background: rgba(3, 9, 17, 0.72);
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.event-stat span,
+.event-stat b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-stat span {
+  color: #748b97;
+  font-size: 6px;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+}
+
+.event-stat b {
+  margin-top: 3px;
+  color: #e9e4d8;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+}
+
+.event-stat.session b { color: #72dcff; }
+.event-stat.pole b { color: #e8c36e; }
+.event-stat.title-watch b { color: #c7a7ff; }
+.event-stat.trophy b { color: #f0ce7d; }
+
+.grid-racer {
+  grid-template-rows: auto auto;
+}
+
+.grid-racer small {
+  grid-column: 2 / 4;
+  display: block;
+  min-width: 0;
+  margin-top: 3px;
+  color: #76909d;
+  font-size: 6px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weekend-note {
+  margin-top: 11px;
+  max-width: 780px;
+  color: #8ca2ad;
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+  text-align: center;
+}
+
+.qualifying-lock {
+  margin-top: 6px;
+  padding: 5px 7px;
+  border: 1px solid rgba(202, 166, 90, 0.2);
+  background: rgba(202, 166, 90, 0.04);
+  color: #a99160;
+  font-size: 6px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.podium {
+  position: absolute;
+  z-index: 16;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 28px;
+  opacity: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(203, 157, 70, 0.22), transparent 26%),
+    radial-gradient(circle at 50% 50%, rgba(70, 198, 236, 0.13), transparent 46%),
+    rgba(2, 5, 10, 0.88);
+  backdrop-filter: blur(10px);
+  transition: opacity 0.28s ease;
+}
+
+.podium.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.podium-kicker {
+  color: #6ddcff;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.34em;
+}
+
+.podium-trophy {
+  margin-top: 8px;
+  font-size: 54px;
+  filter: drop-shadow(0 0 24px rgba(224, 177, 95, 0.4));
+}
+
+.podium h2 {
+  margin: 4px 0 0;
+  max-width: 900px;
+  color: #e9c77b;
+  font-size: clamp(28px, 5vw, 66px);
+  line-height: 0.95;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.podium-sub {
+  margin-top: 8px;
+  color: #879ca7;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.podium-grid {
+  width: min(760px, 90vw);
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1.18fr 1fr;
+  align-items: end;
+  gap: 8px;
+}
+
+.podium-place {
+  min-height: 120px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 28px rgba(255, 255, 255, 0.025);
+}
+
+.podium-place.first {
+  min-height: 170px;
+  border-color: rgba(230, 183, 90, 0.62);
+  background: linear-gradient(180deg, rgba(230, 183, 90, 0.12), rgba(255, 255, 255, 0.03));
+}
+
+.podium-place.second { min-height: 142px; }
+.podium-place.third { min-height: 112px; }
+.podium-place > span { color: #7f96a2; font-size: 8px; font-weight: 950; letter-spacing: 0.16em; }
+.podium-place > b { margin-top: 6px; color: #f0ede5; font-size: 20px; }
+.podium-place > strong { margin-top: 3px; color: #d8b56b; font-size: 11px; }
+.podium-place > small { margin-top: 3px; color: #718894; font-size: 7px; }
+
+.podium-close {
+  margin-top: 18px;
+  min-width: 180px;
+}
+
+.event-session-tag {
+  display: inline-block;
+  margin-left: 6px;
+  color: #e4bc68;
+}
+
+@media (max-width: 1050px) {
+  .event-strip {
+    top: 94px;
+    width: min(620px, 58vw);
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .event-strip { display: none; }
+  .podium-grid { gap: 4px; }
+  .podium-place { padding: 8px; }
+  .podium-place > b { font-size: 15px; }
+}
