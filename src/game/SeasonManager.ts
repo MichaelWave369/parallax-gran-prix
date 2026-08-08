@@ -1,4 +1,5 @@
 import { RACERS } from './config';
+import type { EventWeekendReceipt } from './EventWeekendManager';
 import type { RunHealthReport } from './RaceHealthMonitor';
 import type { RaceReceipt, Standing } from './RaceEngine';
 import type { SportingRaceReport, SportingSplit, SpeedTrapHit } from './SportingIntelligence';
@@ -23,6 +24,7 @@ export type SeasonRaceRecord = {
   receipt: RaceReceipt;
   health?: RunHealthReport;
   sporting?: SportingRaceReport;
+  weekend?: EventWeekendReceipt;
   results: SeasonRaceResult[];
 };
 
@@ -42,6 +44,16 @@ export type TeamStanding = {
   points: number;
   wins: number;
   dnfs: number;
+};
+
+export type ChampionshipImplication = {
+  baseline: boolean;
+  leader: DriverStanding | null;
+  challenger: DriverStanding | null;
+  gap: number;
+  maxSingleRaceSwing: number;
+  leadInPlay: boolean;
+  narrative: string;
 };
 
 export type CareerDriverStat = {
@@ -131,7 +143,8 @@ export class SeasonManager {
     standings: Standing[],
     circuit: CircuitDefinition,
     health?: RunHealthReport,
-    sporting?: SportingRaceReport
+    sporting?: SportingRaceReport,
+    weekend?: EventWeekendReceipt
   ) {
     const round = this.getNextRoundNumber();
     const record: SeasonRaceRecord = {
@@ -145,6 +158,7 @@ export class SeasonManager {
       receipt: structuredClone(receipt),
       health: health ? structuredClone(health) : undefined,
       sporting: sporting ? structuredClone(sporting) : undefined,
+      weekend: weekend ? structuredClone(weekend) : undefined,
       results: standings.map((standing) => ({
         place: standing.place,
         id: standing.id,
@@ -197,6 +211,41 @@ export class SeasonManager {
       || a.dnfs - b.dnfs
       || a.name.localeCompare(b.name)
     );
+  }
+
+  getChampionshipImplications(): ChampionshipImplication {
+    const drivers = this.getDriverStandings();
+    if (!this.state.races.length) {
+      return {
+        baseline: true,
+        leader: null,
+        challenger: null,
+        gap: 0,
+        maxSingleRaceSwing: POINTS[0],
+        leadInPlay: true,
+        narrative: 'Championship baseline: no points scored yet.'
+      };
+    }
+
+    const leader = drivers[0] ?? null;
+    const challenger = drivers[1] ?? null;
+    const gap = leader && challenger ? Math.max(0, leader.points - challenger.points) : 0;
+    const leadInPlay = Boolean(leader && challenger && gap <= POINTS[0]);
+    const narrative = leader && challenger
+      ? leadInPlay
+        ? `${challenger.code} trails ${leader.code} by ${gap} pts — the championship lead is mathematically in play this round.`
+        : `${leader.code} leads ${challenger.code} by ${gap} pts — one race cannot erase the full margin.`
+      : 'Championship implication unavailable.';
+
+    return {
+      baseline: false,
+      leader,
+      challenger,
+      gap,
+      maxSingleRaceSwing: POINTS[0],
+      leadInPlay,
+      narrative
+    };
   }
 
   getTeamStandings(): TeamStanding[] {
@@ -342,9 +391,11 @@ export class SeasonManager {
       exportedAt: new Date().toISOString(),
       pointsSystem: [...POINTS],
       dnfRule: 'DNF results receive zero championship points.',
+      qualifyingRule: 'Championship qualifying sets the starting grid only. The feature race remains physics-authoritative after launch.',
       season: this.state,
       drivers: this.getDriverStandings(),
       teams: this.getTeamStandings(),
+      implications: this.getChampionshipImplications(),
       career: this.career,
       careerDrivers: this.getCareerStats(),
       circuitRecords: CIRCUITS.filter((circuit) => circuit.status === 'playable')
