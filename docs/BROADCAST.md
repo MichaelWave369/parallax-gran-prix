@@ -6,7 +6,7 @@ The BRBC is the official fictional broadcast layer of Parallax Gran Prix.
 
 **Role:** Play-by-play
 
-Threve reacts to immediate race action: launches, overtakes, pileups, comebacks, close finishes, and improbable recoveries.
+Threve reacts to launches, overtakes, pileups, comebacks, close finishes, and improbable recoveries.
 
 Style: fast, excitable, delighted, occasionally incomprehensible.
 
@@ -14,7 +14,7 @@ Style: fast, excitable, delighted, occasionally incomprehensible.
 
 **Role:** Technical analyst
 
-Six't translates telemetry into understandable race analysis: velocity, spin, route delta, collision chains, field position, and future replay metrics.
+Six't translates telemetry into understandable race analysis: velocity, route delta, collision chains, field position, battle gaps, and replay evidence.
 
 Style: precise until the race becomes sufficiently ridiculous.
 
@@ -32,46 +32,63 @@ Canonical minimal response:
 
 The broadcast system may:
 
-- select commentary lines,
+- detect semantic events from race telemetry,
 - choose camera emphasis,
 - display telemetry,
-- trigger replays,
+- queue multi-announcer exchanges,
+- trigger visual replays,
 - summarize race events.
 
 The broadcast system may **not**:
 
 - choose the winner,
-- change racer physics to manufacture drama,
+- apply forces to manufacture drama,
+- change racer physics,
+- change finish timing,
+- alter race receipts,
 - hide simulation changes that affect sporting outcome.
 
-## Event flow
+## Current event flow
 
 ```text
 Physics world
    ↓
-Race state derivation
+Authoritative race state
    ↓
-Semantic event
+Semantic event detection
    ↓
-BRBC director
-   ↓
-Threve / Six't / Noine line
-   ↓
-HUD / audio / replay cue
+BRBC Broadcast Director
+   ├── camera shot selection
+   ├── battle/overtake focus
+   ├── commentary exchange queue
+   └── replay cue
+            ↓
+     Threve / Six't / Noine
+            ↓
+        HUD / replay
 ```
 
-## Future event vocabulary
+## Current event vocabulary
 
+- `opening`
+- `start`
+- `lead-change`
 - `overtake`
-- `lead_change`
-- `multi_collision`
-- `route_split`
-- `largest_comeback`
-- `photo_finish`
-- `stalled_racer`
-- `reentry`
-- `record_lap`
-- `championship_change`
+- `battle`
+- `collision`
+- `sector`
+- `split`
+- `final-ten`
+- `finish`
+- `photo-finish`
+- `winner`
+- `replay`
+
+## Slice 3 additions
+
+Slice 3 introduces a telemetry-driven Broadcast Director, closest-battle detection, overtake detection, automatic shot selection, three-announcer conversation sequences, racer identity codes, and a recorded-pose finish replay.
+
+See [`BROADCAST_DIRECTOR.md`](./BROADCAST_DIRECTOR.md) for the detailed boundary and shot vocabulary.
 
 ## Future voice mode
 
