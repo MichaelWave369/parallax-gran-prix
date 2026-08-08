@@ -1,5 +1,6 @@
 export type DirectorShot =
   | 'grid-wide'
+  | 'wide-overview'
   | 'leader-chase'
   | 'battle-two-shot'
   | 'split-overhead'
