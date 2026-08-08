@@ -30,7 +30,7 @@ export const BACKSPIN_SECTORS: readonly CircuitSector[] = [
   { id: 'needle', name: 'DROP THE NEEDLE', startZ: -50, endZ: -31 },
   { id: 'groove', name: 'GROOVE RUN', startZ: -31, endZ: -11 },
   { id: 'tonearm', name: 'TONEARM CROSSING', startZ: -11, endZ: 10 },
-  { id: 'crossfader', name: 'CROSSFADER SPLIT', startZ: 10, endZ: 31 },
+  { id: 'split', name: 'CROSSFADER SPLIT', startZ: 10, endZ: 31 },
   { id: 'speaker', name: 'SPEAKER STACK SPRINT', startZ: 31, endZ: 50 }
 ] as const;
 
