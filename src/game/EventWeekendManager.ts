@@ -1,5 +1,7 @@
-import type { Standing } from './RaceEngine';
 import type { RacerDefinition } from './config';
+import type { RunHealthReport } from './RaceHealthMonitor';
+import type { RaceReceipt, Standing } from './RaceEngine';
+import type { SportingRaceReport } from './SportingIntelligence';
 
 const STORAGE_KEY = 'parallax-gran-prix.weekends.v1';
 
@@ -28,6 +30,9 @@ export type EventWeekendReceipt = {
   qualifyingCompletedAt: string;
   pole: QualifyingRow | null;
   grid: QualifyingRow[];
+  qualifyingReceipt?: RaceReceipt;
+  qualifyingHealth?: RunHealthReport;
+  qualifyingSporting?: SportingRaceReport;
 };
 
 type WeekendRecord = EventWeekendReceipt & {
@@ -100,7 +105,12 @@ export class EventWeekendManager {
     racers.sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999));
   }
 
-  recordQualifying(standings: Standing[]) {
+  recordQualifying(
+    standings: Standing[],
+    receipt?: RaceReceipt,
+    health?: RunHealthReport,
+    sporting?: SportingRaceReport
+  ) {
     if (!this.options.championshipEligible) return undefined;
 
     const grid: QualifyingRow[] = standings.map((standing, index) => ({
@@ -125,7 +135,10 @@ export class EventWeekendManager {
       qualifyingSeed: this.qualifyingSeed,
       qualifyingCompletedAt: new Date().toISOString(),
       pole: grid[0] ? { ...grid[0] } : null,
-      grid
+      grid,
+      qualifyingReceipt: receipt ? structuredClone(receipt) : undefined,
+      qualifyingHealth: health ? structuredClone(health) : undefined,
+      qualifyingSporting: sporting ? structuredClone(sporting) : undefined
     };
 
     this.state.records = this.state.records.filter((candidate) => candidate.eventId !== this.eventId);
@@ -164,7 +177,10 @@ export class EventWeekendManager {
       qualifyingSeed: record.qualifyingSeed,
       qualifyingCompletedAt: record.qualifyingCompletedAt,
       pole: record.pole ? { ...record.pole } : null,
-      grid: record.grid.map((row) => ({ ...row }))
+      grid: record.grid.map((row) => ({ ...row })),
+      qualifyingReceipt: record.qualifyingReceipt ? structuredClone(record.qualifyingReceipt) : undefined,
+      qualifyingHealth: record.qualifyingHealth ? structuredClone(record.qualifyingHealth) : undefined,
+      qualifyingSporting: record.qualifyingSporting ? structuredClone(record.qualifyingSporting) : undefined
     };
   }
 
