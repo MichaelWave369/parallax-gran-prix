@@ -3,6 +3,7 @@ import { getCircuitById } from '../TrackRegistry';
 import type { CircuitRuntime } from './CircuitRuntime';
 import { buildBattlecaseCircuit } from './BattlecaseCircuit';
 import { buildBackspin96Circuit } from './Backspin96Circuit';
+import { buildSpaungearCircuit } from './SpaungearCircuit';
 
 export type CircuitModule = CircuitDefinition & {
   build(runtime: CircuitRuntime): void;
@@ -21,6 +22,11 @@ const BUILDERS: Record<string, BuilderConfig> = {
   'backspin-96': {
     build: buildBackspin96Circuit,
     splitWindow: { startZ: 11.5, endZ: 17.5 },
+    splitCameraZ: 21
+  },
+  spaungear: {
+    build: buildSpaungearCircuit,
+    splitWindow: { startZ: 13.2, endZ: 18.8 },
     splitCameraZ: 21
   }
 };
