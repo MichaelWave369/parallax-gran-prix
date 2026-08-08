@@ -10,39 +10,76 @@ The official broadcast team is the **British Robot Broadcasting Corporation (BRB
 - **Six't** — technical analyst
 - **Noine** — senior commentator
 
+## Play online
+
+GitHub Pages deployment is configured for:
+
+**https://michaelwave369.github.io/parallax-gran-prix/**
+
+The Pages workflow builds the same Vite application from `main` and deploys the generated `dist` artifact.
+
 ## Project status
 
-**Pre-alpha / foundation build.** The first playable target is a browser-based Battlecase Circuit prototype with 12 physics racers, race timing, standings, spectator cameras, telemetry, and event-driven BRBC commentary.
+**Pre-alpha / Slice 2.** The Battlecase Circuit is now a playable browser race with 12 physics racers, seeded simulation, live standings, sector-aware cameras, moving physical obstacles, a real left/right Parallax Split, photo-finish detection, race receipts, and event-driven BRBC commentary.
 
-## First playable target
+## Current Battlecase Circuit
+
+1. **Boot Straight** — launch and field formation.
+2. **GPU Canyon** — alternating heatsink blocks create a chicane.
+3. **Cooling Gauntlet** — moving physical sweepers and fan-hub bumpers.
+4. **Parallax Split** — racers physically choose left or right around a central divider.
+5. **Motherboard Sprint** — final slalom into the finish gate.
+
+## Current features
 
 - 12 simulated Field Vessels
-- Battlecase Circuit
+- Battlecase Circuit Slice 2
 - deterministic race seed support
-- lap/checkpoint timing
-- position tracking
-- spectator / chase cameras
+- live timing and position tracking
+- automatic, chase, wide, and finish cameras
+- moving cannon-es track obstacles
+- sector transitions
+- Parallax Split route receipts
+- photo-finish detection
 - BRBC event feed
 - post-race receipt
+- GitHub Actions CI
+- GitHub Pages deployment workflow
 
 ## Principles
 
 1. **Physics decides the result.** No hidden winner scripting.
-2. **Readable chaos.** Telemetry and replay should explain what happened.
+2. **Readable chaos.** Telemetry and receipts should explain what happened.
 3. **Spectator-first.** Watching a race should be fun even when you do nothing.
 4. **Parallax identity.** Original racers, circuits, announcers, art direction, and lore.
 5. **Mod-friendly architecture.** Community circuits and racers should become possible without rewriting the engine.
+6. **Broadcast never overrides sport.** BRBC may dramatize simulation events but cannot alter finishing order.
 
-## Technology direction
+## Local development
 
-The initial browser prototype uses **TypeScript + Vite + Three.js + cannon-es**.
+```bash
+npm install
+npm run dev
+```
+
+Production build:
+
+```bash
+npm run build
+```
+
+The project uses a Vite base path of `/parallax-gran-prix/` for GitHub Pages.
+
+## Technology
+
+**TypeScript + Vite + Three.js + cannon-es**
 
 ## Repository map
 
 ```text
 src/                 playable browser prototype
 docs/                design, architecture, circuits, broadcast rules
-public/               static assets
+.github/workflows/    CI and GitHub Pages deployment
 ```
 
 ## License

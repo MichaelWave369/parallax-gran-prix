@@ -1,5 +1,5 @@
 import './styles.css';
-import { RaceEngine, type BroadcastMessage, type RaceSnapshot } from './game/RaceEngine';
+import { RaceEngine, type BroadcastMessage, type RaceReceipt, type RaceSnapshot } from './game/RaceEngine';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
@@ -8,11 +8,12 @@ app.innerHTML = `
   <main class="shell">
     <section class="viewport" id="viewport">
       <div class="brand">
-        <div class="eyebrow">PARALLAX FIELD THEORY SPORTS</div>
+        <div class="eyebrow">PARALLAX FIELD THEORY SPORTS · BRBC LIVE</div>
         <h1>PARALLAX <span>GRAN PRIX</span></h1>
-        <p>BATTLECASE CIRCUIT · FIRST PLAYABLE</p>
+        <p>BATTLECASE CIRCUIT · SLICE 2</p>
       </div>
 
+      <div class="sector-banner" id="sector-banner">BOOT STRAIGHT</div>
       <div class="countdown" id="countdown" aria-live="assertive"></div>
 
       <div class="hud hud-left">
@@ -21,6 +22,7 @@ app.innerHTML = `
           <button id="start">START RACE</button>
           <button id="reset" class="secondary">RESET</button>
         </div>
+        <button id="camera" class="secondary camera-button">CAMERA · AUTO</button>
         <label class="seed-label" for="seed">SIMULATION SEED</label>
         <div class="seed-row">
           <input id="seed" type="number" inputmode="numeric" />
@@ -30,6 +32,13 @@ app.innerHTML = `
           <span>STATE</span><strong id="state">READY</strong>
           <span>TIME</span><strong id="time">0.00</strong>
           <span>LEADER</span><strong id="leader">—</strong>
+          <span>SECTOR</span><strong id="sector">BOOT STRAIGHT</strong>
+        </div>
+        <div class="course-key">
+          <span>GPU CANYON</span>
+          <span>COOLING GAUNTLET</span>
+          <span>PARALLAX SPLIT</span>
+          <span>MOTHERBOARD SPRINT</span>
         </div>
       </div>
 
@@ -37,6 +46,8 @@ app.innerHTML = `
         <div class="hud-label">LIVE STANDINGS</div>
         <ol class="standings" id="standings"></ol>
       </div>
+
+      <aside class="receipt" id="receipt" aria-live="polite"></aside>
 
       <div class="broadcast">
         <div class="brbc-mark">
@@ -49,7 +60,7 @@ app.innerHTML = `
         </div>
       </div>
 
-      <div class="footer-tag">GRAVITY IS OPTIONAL. <i>◇</i> GLORY IS EVERYTHING.</div>
+      <div class="footer-tag">PICK YOUR VESSEL. ENTER THE FIELD. <i>◇</i> REALITY TAKES IT FROM THERE.</div>
     </section>
   </main>
 `;
@@ -57,15 +68,19 @@ app.innerHTML = `
 const viewport = document.querySelector<HTMLElement>('#viewport')!;
 const startButton = document.querySelector<HTMLButtonElement>('#start')!;
 const resetButton = document.querySelector<HTMLButtonElement>('#reset')!;
+const cameraButton = document.querySelector<HTMLButtonElement>('#camera')!;
 const applySeedButton = document.querySelector<HTMLButtonElement>('#apply-seed')!;
 const seedInput = document.querySelector<HTMLInputElement>('#seed')!;
 const stateEl = document.querySelector<HTMLElement>('#state')!;
 const timeEl = document.querySelector<HTMLElement>('#time')!;
 const leaderEl = document.querySelector<HTMLElement>('#leader')!;
+const sectorEl = document.querySelector<HTMLElement>('#sector')!;
+const sectorBannerEl = document.querySelector<HTMLElement>('#sector-banner')!;
 const countdownEl = document.querySelector<HTMLElement>('#countdown')!;
 const standingsEl = document.querySelector<HTMLOListElement>('#standings')!;
 const speakerEl = document.querySelector<HTMLElement>('#speaker')!;
 const lineEl = document.querySelector<HTMLElement>('#line')!;
+const receiptEl = document.querySelector<HTMLElement>('#receipt')!;
 
 const query = new URLSearchParams(window.location.search);
 const querySeed = Number(query.get('seed'));
@@ -83,6 +98,10 @@ const engine = new RaceEngine(viewport, {
 
 startButton.addEventListener('click', () => engine.startRace());
 resetButton.addEventListener('click', () => engine.resetRace());
+cameraButton.addEventListener('click', () => {
+  const mode = engine.cycleCameraMode();
+  cameraButton.textContent = `CAMERA · ${mode.toUpperCase()}`;
+});
 applySeedButton.addEventListener('click', applySeed);
 seedInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') applySeed();
@@ -101,7 +120,15 @@ function renderSnapshot(snapshot: RaceSnapshot) {
   stateEl.textContent = snapshot.state.toUpperCase();
   timeEl.textContent = snapshot.elapsed.toFixed(2);
   leaderEl.textContent = snapshot.leader?.name ?? '—';
+  sectorEl.textContent = snapshot.sector;
   seedInput.value = String(snapshot.seed);
+  cameraButton.textContent = `CAMERA · ${snapshot.cameraMode.toUpperCase()}`;
+
+  if (sectorBannerEl.textContent !== snapshot.sector) {
+    sectorBannerEl.textContent = snapshot.sector;
+    sectorBannerEl.classList.remove('flash');
+    requestAnimationFrame(() => sectorBannerEl.classList.add('flash'));
+  }
 
   countdownEl.textContent = snapshot.countdown > 0 ? String(snapshot.countdown) : '';
   countdownEl.classList.toggle('visible', snapshot.countdown > 0);
@@ -121,6 +148,35 @@ function renderSnapshot(snapshot: RaceSnapshot) {
       </li>
     `;
   }).join('');
+
+  renderReceipt(snapshot.receipt);
+}
+
+function renderReceipt(receipt?: RaceReceipt) {
+  if (!receipt) {
+    receiptEl.classList.remove('visible');
+    receiptEl.innerHTML = '';
+    return;
+  }
+
+  const margin = receipt.margin === null ? '—' : `${receipt.margin.toFixed(3)}s`;
+  const winningTime = receipt.winningTime === null ? '—' : `${receipt.winningTime.toFixed(3)}s`;
+  receiptEl.innerHTML = `
+    <div class="receipt-title">PARALLAX RACE RECEIPT</div>
+    <div class="receipt-winner">${escapeHtml(receipt.winner)}</div>
+    <div class="receipt-grid">
+      <span>WIN TIME</span><b>${winningTime}</b>
+      <span>MARGIN</span><b>${margin}</b>
+      <span>PHOTO FINISH</span><b>${receipt.photoFinish ? 'YES' : 'NO'}</b>
+      <span>LEAD CHANGES</span><b>${receipt.leadChanges}</b>
+      <span>BRBC COLLISIONS</span><b>${receipt.collisionEvents}</b>
+      <span>SPLIT L / R</span><b>${receipt.splitLeft} / ${receipt.splitRight}</b>
+      <span>FINISHERS</span><b>${receipt.finishers}/12</b>
+      <span>SEED</span><b>${receipt.seed}</b>
+    </div>
+    <div class="receipt-rule">SIMULATION AUTHORITATIVE · BROADCAST DESCRIPTIVE</div>
+  `;
+  receiptEl.classList.add('visible');
 }
 
 function renderBroadcast(message: BroadcastMessage) {
