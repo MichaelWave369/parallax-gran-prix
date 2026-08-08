@@ -1,0 +1,124 @@
+.sporting-strip {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(160, 218, 255, 0.16);
+  display: grid;
+  gap: 7px;
+}
+
+.sporting-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #b7e9ff;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.sporting-head b {
+  color: #c99cff;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+.sporting-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.sporting-stat {
+  min-width: 0;
+  padding: 6px 7px;
+  background: rgba(150, 216, 255, 0.035);
+  border: 1px solid rgba(127, 216, 255, 0.12);
+}
+
+.sporting-stat span,
+.sporting-stat b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sporting-stat span {
+  color: #718b99;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.sporting-stat b {
+  margin-top: 3px;
+  color: #e7edf2;
+  font-size: 9px;
+}
+
+.sporting-stat.record b { color: #e7c46f; }
+.sporting-stat.speed b { color: #77e2ff; }
+.sporting-stat.delta b.negative { color: #8ce09c; }
+.sporting-stat.delta b.positive { color: #efbc75; }
+
+.standing .sport-inline {
+  margin-top: 2px;
+  color: #8aa8b7;
+  font-size: 6px;
+  letter-spacing: 0.03em;
+}
+
+.sport-inline .minus { color: #8ed8a1; }
+.sport-inline .plus { color: #ddb16b; }
+
+.receipt.visible {
+  max-height: calc(100vh - 54px);
+  overflow: auto;
+}
+
+.receipt-sporting {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(179, 136, 255, 0.2);
+  display: grid;
+  gap: 5px;
+}
+
+.receipt-sporting > strong {
+  color: #c9a8ff;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.receipt-sporting-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+}
+
+.receipt-sporting-grid span {
+  color: #8da5b2;
+  font-size: 7px;
+}
+
+.receipt-sporting-grid b {
+  color: #e9e3f0;
+  font-size: 8px;
+  text-align: right;
+}
+
+.career-record-line {
+  padding: 8px;
+  border: 1px solid rgba(181, 139, 255, 0.16);
+  background: rgba(181, 139, 255, 0.035);
+  color: #aab9c2;
+  font-size: 8px;
+}
+
+.career-record-line b { color: #e8c979; }
+
+@media (max-height: 760px) {
+  .sporting-strip { gap: 4px; margin-top: 8px; padding-top: 7px; }
+  .sporting-stat { padding: 4px 6px; }
+}

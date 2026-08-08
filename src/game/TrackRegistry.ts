@@ -7,6 +7,12 @@ export type CircuitSector = {
   endZ: number;
 };
 
+export type SpeedTrapDefinition = {
+  id: string;
+  name: string;
+  z: number;
+};
+
 export type CircuitDefinition = {
   id: string;
   name: string;
@@ -15,6 +21,7 @@ export type CircuitDefinition = {
   seasonRound: number;
   description: string;
   sectors: readonly CircuitSector[];
+  speedTraps?: readonly SpeedTrapDefinition[];
   features: readonly string[];
 };
 
@@ -42,6 +49,14 @@ export const SPAUNGEAR_SECTORS: readonly CircuitSector[] = [
   { id: 'output', name: 'OUTPUT SHAFT', startZ: 31, endZ: 50 }
 ] as const;
 
+export const MIRROR_SECTORS: readonly CircuitSector[] = [
+  { id: 'reflection', name: 'REFLECTION ENTRY', startZ: -50, endZ: -31 },
+  { id: 'symmetry', name: 'SYMMETRY HALL', startZ: -31, endZ: -11 },
+  { id: 'inverse', name: 'INVERSE GATES', startZ: -11, endZ: 10 },
+  { id: 'split', name: 'MIRROR SPLIT', startZ: 10, endZ: 31 },
+  { id: 'prism', name: 'PRISM SPRINT', startZ: 31, endZ: 50 }
+] as const;
+
 export const CIRCUITS: CircuitDefinition[] = [
   {
     id: 'battlecase',
@@ -51,7 +66,11 @@ export const CIRCUITS: CircuitDefinition[] = [
     seasonRound: 1,
     description: 'A motherboard canyon of heatsinks, cooling hardware, rotating sweepers, and the first physical Parallax Split.',
     sectors: BATTLECASE_SECTORS,
-    features: ['gpu-canyon', 'cooling-gauntlet', 'parallax-split', 'finish-replay', 'recovery-marshal']
+    speedTraps: [
+      { id: 'gpu-exit', name: 'GPU EXIT', z: -14 },
+      { id: 'board-speed', name: 'BOARD SPEED', z: 42 }
+    ],
+    features: ['gpu-canyon', 'cooling-gauntlet', 'parallax-split', 'speed-traps', 'finish-replay', 'recovery-marshal']
   },
   {
     id: 'backspin-96',
@@ -61,7 +80,11 @@ export const CIRCUITS: CircuitDefinition[] = [
     seasonRound: 2,
     description: 'A giant DJ deck of platter grooves, tonearm sweepers, a crossfader split, and speaker-cone kickers.',
     sectors: BACKSPIN_SECTORS,
-    features: ['turntables', 'tonearms', 'crossfader', 'speaker-kickers', 'finish-replay', 'recovery-marshal']
+    speedTraps: [
+      { id: 'groove-trap', name: 'GROOVE TRAP', z: -12 },
+      { id: 'speaker-trap', name: 'SPEAKER TRAP', z: 42 }
+    ],
+    features: ['turntables', 'tonearms', 'crossfader', 'speaker-kickers', 'speed-traps', 'finish-replay', 'recovery-marshal']
   },
   {
     id: 'spaungear',
@@ -71,9 +94,26 @@ export const CIRCUITS: CircuitDefinition[] = [
     seasonRound: 3,
     description: 'A mechanical transfer works of pinion fields, rotating timing bars, crown-mesh splits, and output-shaft hazards.',
     sectors: SPAUNGEAR_SECTORS,
-    features: ['gear-fields', 'transfer-gates', 'crown-mesh', 'timing-windows', 'finish-replay', 'recovery-marshal']
+    speedTraps: [
+      { id: 'pinion-trap', name: 'PINION TRAP', z: -12 },
+      { id: 'output-trap', name: 'OUTPUT TRAP', z: 42 }
+    ],
+    features: ['gear-fields', 'transfer-gates', 'crown-mesh', 'timing-windows', 'speed-traps', 'finish-replay', 'recovery-marshal']
   },
-  { id: 'mirror-labyrinth', name: 'Mirror Labyrinth', shortName: 'Mirror', status: 'planned', seasonRound: 4, description: 'Symmetry, inverse routes, reflective tunnels, and misleading geometry.', sectors: [], features: ['mirrors', 'inverse-routes'] },
+  {
+    id: 'mirror-labyrinth',
+    name: 'Mirror Labyrinth',
+    shortName: 'Mirror',
+    status: 'playable',
+    seasonRound: 4,
+    description: 'A mirrored field of symmetric guides, inverse rotating gates, reflective route ambiguity, and a two-path Mirror Split.',
+    sectors: MIRROR_SECTORS,
+    speedTraps: [
+      { id: 'symmetry-trap', name: 'SYMMETRY TRAP', z: -12 },
+      { id: 'prism-trap', name: 'PRISM TRAP', z: 42 }
+    ],
+    features: ['mirrors', 'symmetry-hall', 'inverse-gates', 'mirror-split', 'prism-sprint', 'speed-traps', 'finish-replay', 'recovery-marshal']
+  },
   { id: 'ledger-larry-500', name: 'Ledger Larry 500', shortName: 'Larry 500', status: 'planned', seasonRound: 5, description: 'Administrative machinery, paper rollers, stamps, and catastrophic accounting.', sectors: [], features: ['paperwork', 'audit-gates'] },
   { id: 'phivessel-dream-run', name: 'PhiVessel Dream Run', shortName: 'Dream Run', status: 'planned', seasonRound: 6, description: 'Glowing geometry and shifting dream-state route logic.', sectors: [], features: ['dream-gates', 'dynamic-geometry'] },
   { id: 'carbon-loop', name: 'Carbon Loop', shortName: 'Carbon Loop', status: 'planned', seasonRound: 7, description: 'Feedback loops that can return racers to earlier sections.', sectors: [], features: ['loops', 'reentry'] },

@@ -1,9 +1,11 @@
 import { RACERS } from './config';
 import type { RunHealthReport } from './RaceHealthMonitor';
 import type { RaceReceipt, Standing } from './RaceEngine';
-import type { CircuitDefinition } from './TrackRegistry';
+import type { SportingRaceReport, SportingSplit, SpeedTrapHit } from './SportingIntelligence';
+import { CIRCUITS, type CircuitDefinition } from './TrackRegistry';
 
 const STORAGE_KEY = 'parallax-gran-prix.season.v1';
+const CAREER_KEY = 'parallax-gran-prix.career.v1';
 const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1, 0, 0] as const;
 
 export type SeasonRaceResult = Pick<Standing, 'place' | 'id' | 'code' | 'name' | 'team' | 'finishTime'> & {
@@ -12,6 +14,7 @@ export type SeasonRaceResult = Pick<Standing, 'place' | 'id' | 'code' | 'name' |
 
 export type SeasonRaceRecord = {
   id: string;
+  seasonNumber?: number;
   round: number;
   circuitId: string;
   circuitName: string;
@@ -19,6 +22,7 @@ export type SeasonRaceRecord = {
   completedAt: string;
   receipt: RaceReceipt;
   health?: RunHealthReport;
+  sporting?: SportingRaceReport;
   results: SeasonRaceResult[];
 };
 
@@ -40,6 +44,53 @@ export type TeamStanding = {
   dnfs: number;
 };
 
+export type CareerDriverStat = {
+  id: string;
+  code: string;
+  name: string;
+  team: string;
+  starts: number;
+  finishes: number;
+  wins: number;
+  podiums: number;
+  dnfs: number;
+  totalPoints: number;
+  bestFinish: number | null;
+  averageFinish: number | null;
+  fastestSectorAwards: number;
+  circuitWins: Record<string, number>;
+};
+
+export type CircuitRaceRecord = {
+  racerId: string;
+  racerCode: string;
+  racerName: string;
+  time: number;
+  seasonNumber: number;
+  round: number;
+  seed: number;
+};
+
+export type CircuitSectorRecord = SportingSplit & {
+  seasonNumber: number;
+  round: number;
+  seed: number;
+};
+
+export type CircuitSpeedRecord = SpeedTrapHit & {
+  seasonNumber: number;
+  round: number;
+  seed: number;
+};
+
+export type CircuitRecords = {
+  circuitId: string;
+  raceStarts: number;
+  raceRecord?: CircuitRaceRecord;
+  sectorRecords: Record<string, CircuitSectorRecord>;
+  speedTrapRecords: Record<string, CircuitSpeedRecord>;
+};
+
 export type SeasonState = {
   version: 1;
   seasonNumber: number;
@@ -47,11 +98,19 @@ export type SeasonState = {
   races: SeasonRaceRecord[];
 };
 
+type CareerState = {
+  version: 1;
+  races: SeasonRaceRecord[];
+};
+
 export class SeasonManager {
   private state: SeasonState;
+  private career: CareerState;
 
   constructor() {
     this.state = this.load();
+    this.career = this.loadCareer(this.state.races);
+    this.saveCareer();
   }
 
   getState() {
@@ -71,11 +130,13 @@ export class SeasonManager {
     receipt: RaceReceipt,
     standings: Standing[],
     circuit: CircuitDefinition,
-    health?: RunHealthReport
+    health?: RunHealthReport,
+    sporting?: SportingRaceReport
   ) {
     const round = this.getNextRoundNumber();
     const record: SeasonRaceRecord = {
       id: `S${this.state.seasonNumber}-R${round}-${receipt.seed}`,
+      seasonNumber: this.state.seasonNumber,
       round,
       circuitId: circuit.id,
       circuitName: circuit.name,
@@ -83,6 +144,7 @@ export class SeasonManager {
       completedAt: new Date().toISOString(),
       receipt: structuredClone(receipt),
       health: health ? structuredClone(health) : undefined,
+      sporting: sporting ? structuredClone(sporting) : undefined,
       results: standings.map((standing) => ({
         place: standing.place,
         id: standing.id,
@@ -94,7 +156,9 @@ export class SeasonManager {
       }))
     };
     this.state.races.push(record);
+    if (!this.career.races.some((race) => race.id === record.id)) this.career.races.push(structuredClone(record));
     this.save();
+    this.saveCareer();
     return record;
   }
 
@@ -149,6 +213,119 @@ export class SeasonManager {
     );
   }
 
+  getCareerStats(): CareerDriverStat[] {
+    const rows = RACERS.map((racer) => ({
+      id: racer.id,
+      code: racer.code,
+      name: racer.name,
+      team: racer.team,
+      starts: 0,
+      finishes: 0,
+      wins: 0,
+      podiums: 0,
+      dnfs: 0,
+      totalPoints: 0,
+      bestFinish: null as number | null,
+      averageFinish: null as number | null,
+      fastestSectorAwards: 0,
+      circuitWins: {} as Record<string, number>,
+      finishTotal: 0
+    }));
+    const byId = new Map(rows.map((row) => [row.id, row]));
+
+    this.career.races.forEach((race) => {
+      race.results.forEach((result) => {
+        const row = byId.get(result.id);
+        if (!row) return;
+        row.starts += 1;
+        const finished = result.finished ?? result.finishTime !== undefined;
+        if (!finished) {
+          row.dnfs += 1;
+          return;
+        }
+        row.finishes += 1;
+        row.finishTotal += result.place;
+        row.totalPoints += POINTS[result.place - 1] ?? 0;
+        row.bestFinish = row.bestFinish === null ? result.place : Math.min(row.bestFinish, result.place);
+        if (result.place === 1) {
+          row.wins += 1;
+          row.circuitWins[race.circuitId] = (row.circuitWins[race.circuitId] ?? 0) + 1;
+        }
+        if (result.place <= 3) row.podiums += 1;
+      });
+
+      race.sporting?.fastestSectors.forEach((split) => {
+        const row = byId.get(split.racerId);
+        if (row) row.fastestSectorAwards += 1;
+      });
+    });
+
+    return rows.map(({ finishTotal, ...row }) => ({
+      ...row,
+      averageFinish: row.finishes ? finishTotal / row.finishes : null
+    })).sort((a, b) =>
+      b.wins - a.wins
+      || b.totalPoints - a.totalPoints
+      || b.podiums - a.podiums
+      || b.fastestSectorAwards - a.fastestSectorAwards
+      || a.dnfs - b.dnfs
+      || a.name.localeCompare(b.name)
+    );
+  }
+
+  getCircuitRecords(circuitId: string): CircuitRecords {
+    const records: CircuitRecords = {
+      circuitId,
+      raceStarts: 0,
+      sectorRecords: {},
+      speedTrapRecords: {}
+    };
+
+    this.career.races.filter((race) => race.circuitId === circuitId).forEach((race) => {
+      records.raceStarts += 1;
+      const seasonNumber = this.raceSeasonNumber(race);
+      const winner = race.results.find((result) => (result.finished ?? result.finishTime !== undefined) && result.place === 1);
+      const time = race.receipt.winningTime;
+      if (winner && time !== null && (!records.raceRecord || time < records.raceRecord.time)) {
+        records.raceRecord = {
+          racerId: winner.id,
+          racerCode: winner.code,
+          racerName: winner.name,
+          time,
+          seasonNumber,
+          round: race.round,
+          seed: race.seed
+        };
+      }
+
+      race.sporting?.fastestSectors.forEach((split) => {
+        const existing = records.sectorRecords[split.sectorId];
+        if (!existing || split.duration < existing.duration) {
+          records.sectorRecords[split.sectorId] = {
+            ...structuredClone(split),
+            seasonNumber,
+            round: race.round,
+            seed: race.seed
+          };
+        }
+      });
+
+      race.sporting?.speedTrapRecords.forEach((hit) => {
+        const existing = records.speedTrapRecords[hit.trapId];
+        if (!existing || hit.speed > existing.speed) {
+          records.speedTrapRecords[hit.trapId] = {
+            ...structuredClone(hit),
+            seasonNumber,
+            round: race.round,
+            seed: race.seed
+          };
+        }
+      });
+    });
+
+    return records;
+  }
+
   resetSeason() {
     this.state = {
       version: 1,
@@ -167,7 +344,11 @@ export class SeasonManager {
       dnfRule: 'DNF results receive zero championship points.',
       season: this.state,
       drivers: this.getDriverStandings(),
-      teams: this.getTeamStandings()
+      teams: this.getTeamStandings(),
+      career: this.career,
+      careerDrivers: this.getCareerStats(),
+      circuitRecords: CIRCUITS.filter((circuit) => circuit.status === 'playable')
+        .map((circuit) => this.getCircuitRecords(circuit.id))
     }, null, 2);
   }
 
@@ -188,11 +369,33 @@ export class SeasonManager {
     }
   }
 
+  private loadCareer(seedRaces: SeasonRaceRecord[]): CareerState {
+    try {
+      const raw = localStorage.getItem(CAREER_KEY);
+      if (!raw) return { version: 1, races: structuredClone(seedRaces) };
+      const parsed = JSON.parse(raw) as Partial<CareerState>;
+      if (parsed.version !== 1 || !Array.isArray(parsed.races)) return { version: 1, races: structuredClone(seedRaces) };
+      return { version: 1, races: parsed.races as SeasonRaceRecord[] };
+    } catch {
+      return { version: 1, races: structuredClone(seedRaces) };
+    }
+  }
+
+  private raceSeasonNumber(race: SeasonRaceRecord) {
+    if (race.seasonNumber) return race.seasonNumber;
+    const match = /^S(\d+)-/.exec(race.id);
+    return match ? Math.max(1, Number(match[1])) : 1;
+  }
+
   private newState(seasonNumber: number): SeasonState {
     return { version: 1, seasonNumber, createdAt: new Date().toISOString(), races: [] };
   }
 
   private save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+  }
+
+  private saveCareer() {
+    localStorage.setItem(CAREER_KEY, JSON.stringify(this.career));
   }
 }
