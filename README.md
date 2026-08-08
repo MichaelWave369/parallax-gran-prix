@@ -18,20 +18,30 @@ The GitHub Pages workflow builds the Vite application from `main` and deploys th
 
 ## Project status
 
-**Pre-alpha / Slice 4 — Season + Race Operations.** Battlecase Circuit now runs inside a persistent local championship. Completed physics races become saved event receipts, championship points are derived from finishing order, season history survives reloads, and the season ledger can be exported as JSON.
+**Pre-alpha / Slice 5 — Circuit Engine + Backspin '96.** The shared race/broadcast/season engine now drives two distinct physical circuit modules. Battlecase Circuit has been extracted from `RaceEngine`, Backspin '96 is playable as Round 2, and a transparent Recovery Marshal handles rare physical deadlocks with receipted impulses instead of hidden teleports.
 
-## Current Battlecase Circuit
+## Playable circuits
 
-1. **Boot Straight** — launch and field formation.
-2. **GPU Canyon** — alternating heatsink blocks create a chicane.
-3. **Cooling Gauntlet** — moving physical sweepers and fan-hub bumpers.
-4. **Parallax Split** — racers physically choose left or right around a central divider.
-5. **Motherboard Sprint** — final slalom into the finish gate.
+### Round 1 — Battlecase Circuit
+
+1. **Boot Straight**
+2. **GPU Canyon** — angled heatsink chicanes replace square dead-pocket walls.
+3. **Cooling Gauntlet** — rotating sweepers and fan-hub bumpers.
+4. **Parallax Split** — rounded split nose and two physical routes.
+5. **Motherboard Sprint** — angled final slalom into the finish gate.
+
+### Round 2 — Backspin '96
+
+1. **Drop the Needle**
+2. **Groove Run** — giant record platters and oblique groove guides.
+3. **Tonearm Crossing** — sweeping tonearm hazards.
+4. **Crossfader Split** — left-deck / right-deck route decision.
+5. **Speaker Stack Sprint** — speaker-cone physical kickers into the finish.
 
 ## Season 1 circuit registry
 
-1. Battlecase Circuit — active
-2. Backspin '96 — planned
+1. Battlecase Circuit — playable
+2. Backspin '96 — playable
 3. SPAUNGEAR Works — planned
 4. Mirror Labyrinth — planned
 5. Ledger Larry 500 — planned
@@ -44,10 +54,15 @@ The GitHub Pages workflow builds the Vite application from `main` and deploys th
 
 - 12 simulated Field Vessels with identity codes and trackside labels
 - deterministic race seed support
+- modular `CircuitRuntime` + circuit module resolver
+- two genuinely different playable circuit modules
+- circuit-aware sectors, split cameras, race receipts, and season routing
+- Battlecase dead-pocket geometry repair
+- deterministic **Recovery Marshal** after a verified low-speed/no-progress deadlock
+- every Recovery Marshal intervention counted in the race receipt
 - theatrical opening grid presentation
 - live timing tower and race telemetry
 - moving cannon-es track obstacles
-- sector transitions and Parallax Split route receipts
 - telemetry-driven BRBC Broadcast Director
 - closest-battle and overtake detection
 - automatic TV-style camera direction plus manual spectator overrides
@@ -55,14 +70,13 @@ The GitHub Pages workflow builds the Vite application from `main` and deploys th
 - final-charge British-gibberish mode
 - photo-finish detection
 - visual-only slow-motion finish replay from recorded poses
-- production-aware race receipt
 - persistent local Season 1 championship
 - `25–18–15–12–10–8–6–4–2–1` points table
 - driver and team standings
 - saved race receipt history
-- `NEXT ROUND` reproducible seed preparation
+- circuit-aware `NEXT ROUND` flow
+- manual playable-track switch for exhibitions
 - JSON season-ledger export
-- versioned circuit registry contract
 - GitHub Actions CI
 - automatic GitHub Pages deployment
 
@@ -72,10 +86,11 @@ The GitHub Pages workflow builds the Vite application from `main` and deploys th
 2. **Readable chaos.** Telemetry and receipts should explain what happened.
 3. **Spectator-first.** Watching a race should be fun even when you do nothing.
 4. **Parallax identity.** Original racers, circuits, announcers, art direction, and lore.
-5. **Mod-friendly architecture.** Community circuits and racers should become possible without rewriting the engine.
+5. **Mod-friendly architecture.** New circuits plug into the shared race engine.
 6. **Broadcast never overrides sport.** BRBC may choose the camera, commentary, or replay — never the winner.
 7. **Replay is historical presentation.** Recorded poses are visual evidence, not a second simulation.
 8. **Receipts create standings.** Championship state is derived from recorded race results, never the reverse.
+9. **Recovery is explicit.** Deadlock recovery uses a deterministic physical impulse, never teleportation, and every intervention is receipted.
 
 ## Local development
 
@@ -99,14 +114,18 @@ The project uses a Vite base path of `/parallax-gran-prix/` for GitHub Pages.
 ## Repository map
 
 ```text
-src/game/RaceEngine.ts          authoritative race runtime + presentation bridge
-src/game/BroadcastDirector.ts   telemetry-driven shot/event selection
-src/game/ReplayBuffer.ts        recorded visual pose replay
-src/game/SeasonManager.ts       persistent race history + championship derivation
-src/game/TrackRegistry.ts       Season 1 circuit identity/metadata contract
-src/main.ts                     live BRBC broadcast + race operations UI
-docs/                           design, architecture, circuits, broadcast, race operations
-.github/workflows/              CI and GitHub Pages deployment
+src/game/RaceEngine.ts                  authoritative race runtime + presentation bridge
+src/game/circuits/CircuitRuntime.ts     reusable physical/visual circuit construction tools
+src/game/circuits/CircuitEngine.ts      playable circuit resolver
+src/game/circuits/BattlecaseCircuit.ts  Round 1 circuit module
+src/game/circuits/Backspin96Circuit.ts  Round 2 circuit module
+src/game/BroadcastDirector.ts           telemetry-driven shot/event selection
+src/game/ReplayBuffer.ts                recorded visual pose replay
+src/game/SeasonManager.ts               persistent race history + championship derivation
+src/game/TrackRegistry.ts               Season 1 circuit identity/metadata contract
+src/main.ts                             live BRBC broadcast + race operations UI
+docs/                                   design, architecture, circuits, broadcast, race operations
+.github/workflows/                      CI and GitHub Pages deployment
 ```
 
 ## License
